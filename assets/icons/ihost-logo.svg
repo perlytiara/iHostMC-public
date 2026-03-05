@@ -1,0 +1,24 @@
+<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 32 32">
+  <defs>
+    <linearGradient id="ihost-logo-bg" x1="0%" y1="0%" x2="100%" y2="100%">
+      <stop offset="0%" stop-color="#7c6bff" />
+      <stop offset="100%" stop-color="#5344dd" />
+    </linearGradient>
+    <linearGradient id="ihost-logo-face" x1="0%" y1="0%" x2="0%" y2="100%">
+      <stop offset="0%" stop-color="#8b7dff" />
+      <stop offset="100%" stop-color="#634bff" />
+    </linearGradient>
+  </defs>
+  <rect width="32" height="32" rx="6" fill="url(#ihost-logo-bg)" />
+  <g transform="translate(16, 15.35) scale(1.28) translate(-13.25, -14.75)">
+    <circle cx="11" cy="10" r="2.25" fill="white" />
+    <path
+      d="M11 14v8 M14 14v5 M14 17h4 M18 14v8"
+      stroke="white"
+      stroke-width="2.1"
+      stroke-linecap="round"
+      stroke-linejoin="round"
+      fill="none"
+    />
+  </g>
+</svg>
