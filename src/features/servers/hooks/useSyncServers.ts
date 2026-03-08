@@ -61,7 +61,10 @@ export function useSyncServers(
     try {
       const now = new Date().toISOString();
       const currentServers = serversRef.current;
-      const toSync = serverId ? currentServers.filter((s) => s.id === serverId) : currentServers;
+      const activeServers = currentServers.filter((s) => !s.trashed_at);
+      const toSync = serverId
+        ? activeServers.filter((s) => s.id === serverId)
+        : activeServers;
       for (const s of toSync) {
         const res = await api.syncServer(token, {
           hostId: s.id,
@@ -118,7 +121,8 @@ export function useSyncServers(
   }, [token, refreshSynced]);
 
   useEffect(() => {
-    if (options?.autoSyncOnLoad && token && servers.length > 0 && !syncing) {
+    const active = servers.filter((s) => !s.trashed_at);
+    if (options?.autoSyncOnLoad && token && active.length > 0 && !syncing) {
       syncNow();
     }
   // eslint-disable-next-line react-hooks/exhaustive-deps -- only on token/servers change, not syncNow

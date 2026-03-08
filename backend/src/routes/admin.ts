@@ -1,5 +1,8 @@
 import { Router, Request, Response } from "express";
+import path from "path";
+import fs from "fs";
 import { query } from "../db/pool.js";
+import { config } from "../config.js";
 import { authMiddleware } from "../middleware/auth.js";
 import { adminMiddleware } from "../middleware/admin.js";
 import { getEffectiveTier } from "../tier-resolver.js";
@@ -312,6 +315,158 @@ router.delete("/admins/:userId", async (req: Request, res: Response): Promise<vo
     res.json({ ok: true, userId: targetUserId });
   } catch {
     res.status(500).json({ error: "Failed to remove admin" });
+  }
+});
+
+// ─── Admin Server Management ────────────────────────────────────────────────────
+
+/** GET /api/admin/servers – list all sync servers across users. Query ?userId=, ?trashed=1. */
+router.get("/servers", async (req: Request, res: Response): Promise<void> => {
+  const userId = typeof req.query.userId === "string" ? req.query.userId.trim() : undefined;
+  const trashedOnly = req.query.trashed === "1" || req.query.trashed === "true";
+  try {
+    const trashedClause = trashedOnly ? "AND s.trashed_at IS NOT NULL" : "AND (s.trashed_at IS NULL)";
+    const userClause = userId ? "AND s.user_id = $1" : "";
+    const params = userId ? [userId] : [];
+    const r = await query<{
+      id: string;
+      host_id: string;
+      name: string;
+      user_id: string;
+      user_email: string;
+      trashed_at: string | null;
+      created_at: string;
+      updated_at: string;
+      backup_count: string;
+    }>(
+      `SELECT s.id, s.host_id, s.name, s.user_id, u.email AS user_email, s.trashed_at, s.created_at, s.updated_at, COALESCE(s.backup_count, 0)::text AS backup_count
+       FROM sync_servers s
+       JOIN users u ON u.id = s.user_id
+       WHERE 1=1 ${userClause} ${trashedClause}
+       ORDER BY s.updated_at DESC
+       LIMIT 500`,
+      userId ? [userId] : []
+    );
+    res.json({
+      servers: r.rows.map((row) => ({
+        id: row.id,
+        hostId: row.host_id,
+        name: row.name,
+        userId: row.user_id,
+        userEmail: row.user_email,
+        trashedAt: row.trashed_at ?? null,
+        createdAt: row.created_at,
+        updatedAt: row.updated_at,
+        backupCount: parseInt(row.backup_count, 10) || 0,
+      })),
+    });
+  } catch (e) {
+    const msg = (e as Error)?.message ?? "";
+    if (msg.includes("trashed_at") || msg.includes("sync_servers")) {
+      res.json({ servers: [] });
+      return;
+    }
+    res.status(500).json({ error: "Failed to list servers" });
+  }
+});
+
+/** PATCH /api/admin/servers/:id – admin trash/restore a server. Body: { trashed?: boolean, restoreFromTrash?: boolean }. */
+router.patch("/servers/:id", async (req: Request, res: Response): Promise<void> => {
+  const id = req.params.id;
+  const body = req.body as { trashed?: boolean; restoreFromTrash?: boolean };
+  if (!id) {
+    res.status(400).json({ error: "Server ID required" });
+    return;
+  }
+  try {
+    if (body.trashed === true) {
+      const r = await query(
+        "UPDATE sync_servers SET trashed_at = now(), backup_count = 0, updated_at = now() WHERE id = $1 AND trashed_at IS NULL RETURNING id",
+        [id]
+      );
+      if (r.rowCount === 0) {
+        res.status(404).json({ error: "Server not found or already in trash" });
+        return;
+      }
+      await query(
+        "UPDATE backups SET deleted_at = now() WHERE server_id = $1 AND deleted_at IS NULL",
+        [id]
+      );
+      res.json({ ok: true, trashed: true });
+      return;
+    }
+    if (body.restoreFromTrash === true) {
+      const r = await query(
+        "UPDATE sync_servers SET trashed_at = NULL, updated_at = now() WHERE id = $1 AND trashed_at IS NOT NULL RETURNING id",
+        [id]
+      );
+      if (r.rowCount === 0) {
+        res.status(404).json({ error: "Server not found or not in trash" });
+        return;
+      }
+      res.json({ ok: true, restored: true });
+      return;
+    }
+    res.status(400).json({ error: "Provide trashed: true or restoreFromTrash: true" });
+  } catch {
+    res.status(500).json({ error: "Failed to update server" });
+  }
+});
+
+/** DELETE /api/admin/servers/:id – admin permanently delete a server (must be in trash). */
+router.delete("/servers/:id", async (req: Request, res: Response): Promise<void> => {
+  const id = req.params.id;
+  if (!id) {
+    res.status(400).json({ error: "Server ID required" });
+    return;
+  }
+  try {
+    const check = await query<{ user_id: string }>(
+      "SELECT user_id FROM sync_servers WHERE id = $1 AND trashed_at IS NOT NULL",
+      [id]
+    );
+    if (check.rows.length === 0) {
+      res.status(400).json({ error: "Server must be in trash before permanent delete" });
+      return;
+    }
+    const userId = check.rows[0]!.user_id;
+    const backups = await query<{ id: string; storage_path: string }>(
+      "SELECT id, storage_path FROM backups WHERE server_id = $1 AND user_id = $2",
+      [id, userId]
+    );
+    const basePath = config.backupStoragePath || "";
+    for (const row of backups.rows) {
+      if (row.storage_path && !row.storage_path.includes("__snapshot_")) {
+        try {
+          const fullPath = path.join(basePath, row.storage_path);
+          if (fs.existsSync(fullPath)) fs.unlinkSync(fullPath);
+        } catch {}
+      }
+      await query("DELETE FROM backups WHERE id = $1 AND user_id = $2", [row.id, userId]);
+    }
+    const filesResult = await query<{ storage_path: string }>(
+      "SELECT storage_path FROM sync_files WHERE server_id = $1 AND user_id = $2",
+      [id, userId]
+    );
+    const syncBase = config.backupStoragePath || "/tmp/ihostmc-sync";
+    for (const f of filesResult.rows) {
+      if (f.storage_path) {
+        try {
+          const fp = path.join(syncBase, "sync", userId, id, f.storage_path);
+          if (fs.existsSync(fp)) fs.unlinkSync(fp);
+        } catch {}
+      }
+    }
+    const serverSyncDir = path.join(syncBase, "sync", userId, id);
+    try {
+      if (fs.existsSync(serverSyncDir)) fs.rmSync(serverSyncDir, { recursive: true });
+    } catch {}
+    await query("DELETE FROM sync_files WHERE server_id = $1 AND user_id = $2", [id, userId]);
+    await query("DELETE FROM sync_manifests WHERE server_id = $1 AND user_id = $2", [id, userId]);
+    await query("DELETE FROM sync_servers WHERE id = $1 AND user_id = $2", [id, userId]);
+    res.json({ ok: true });
+  } catch {
+    res.status(500).json({ error: "Failed to delete server" });
   }
 });
 

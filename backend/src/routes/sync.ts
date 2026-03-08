@@ -444,6 +444,49 @@ router.patch("/servers/:id", async (req: Request, res: Response): Promise<void> 
   }
 });
 
+/** POST /api/sync/trash/purge – permanently delete sync servers in trash for 30+ days (auto-cleanup like backups). */
+const SYNC_TRASH_RETENTION_DAYS = 30;
+router.post("/trash/purge", async (req: Request, res: Response): Promise<void> => {
+  const userId = (req as Request & { userId: string }).userId;
+  try {
+    const result = await query<{ id: string }>(
+      `SELECT id FROM sync_servers WHERE user_id = $1 AND trashed_at IS NOT NULL AND trashed_at < now() - interval '1 day' * $2`,
+      [userId, SYNC_TRASH_RETENTION_DAYS]
+    );
+    for (const row of result.rows) {
+      try {
+        const backups = await query<{ id: string; storage_path: string }>(
+          "SELECT id, storage_path FROM backups WHERE server_id = $1 AND user_id = $2",
+          [row.id, userId]
+        );
+        const basePath = config.backupStoragePath || "";
+        for (const b of backups.rows) {
+          if (b.storage_path && !b.storage_path.includes("__snapshot_")) {
+            try {
+              const fullPath = path.join(basePath, b.storage_path);
+              if (fs.existsSync(fullPath)) fs.unlinkSync(fullPath);
+            } catch {}
+          }
+          await query("DELETE FROM backups WHERE id = $1 AND user_id = $2", [b.id, userId]);
+        }
+        await clearSyncedDataForServer(userId, row.id);
+        await query("DELETE FROM sync_servers WHERE id = $1 AND user_id = $2", [row.id, userId]);
+      } catch {}
+    }
+    noCache(res);
+    res.json({ ok: true, purged: result.rows.length });
+  } catch (e) {
+    const msg = (e as Error)?.message ?? "";
+    if (isTableMissing(msg) || msg.includes("trashed_at")) {
+      noCache(res);
+      res.json({ ok: true, purged: 0 });
+      return;
+    }
+    noCache(res);
+    res.status(500).json({ error: "Failed to purge sync trash" });
+  }
+});
+
 /** DELETE /api/sync/servers/:id – permanently delete a server. Only allowed when server is in trash. Deletes server, all its backups, and sync data. */
 router.delete("/servers/:id", async (req: Request, res: Response): Promise<void> => {
   const userId = (req as Request & { userId: string }).userId;

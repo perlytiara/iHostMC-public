@@ -6,7 +6,7 @@ import { getPath, type Locale } from "@/i18n/pathnames";
 import { useLocale } from "next-intl";
 import { getApiBaseUrl, getStoredToken, clearStoredAuth, responseJson } from "@/lib/api";
 import { DashboardLoadingBlock } from "@/components/DashboardLoadingBlock";
-import { RefreshCw, ShieldAlert, Search, Users, ShieldPlus, ShieldX } from "lucide-react";
+import { RefreshCw, ShieldAlert, Search, Users, ShieldPlus, ShieldX, Server, Trash2, RotateCcw } from "lucide-react";
 import { SafeIcon } from "@/components/SafeIcon";
 import { Button } from "@/components/ui/button";
 
@@ -67,6 +67,12 @@ export default function DashboardAdminPage() {
   const [removingAdminUserId, setRemovingAdminUserId] = useState<string | null>(null);
   const [makingAdminUserId, setMakingAdminUserId] = useState<string | null>(null);
   const [adminSuccessMessage, setAdminSuccessMessage] = useState<string | null>(null);
+
+  const [adminServers, setAdminServers] = useState<{ id: string; hostId: string; name: string; userId: string; userEmail: string; trashedAt: string | null; createdAt: string; updatedAt: string; backupCount: number }[]>([]);
+  const [adminServersLoading, setAdminServersLoading] = useState(false);
+  const [adminServersFilter, setAdminServersFilter] = useState<"active" | "trash">("active");
+  const [adminServersUserId, setAdminServersUserId] = useState("");
+  const [adminServerActionId, setAdminServerActionId] = useState<string | null>(null);
 
   const base = getApiBaseUrl();
   const adminUserIds = new Set(admins.map((a) => a.userId));
@@ -144,6 +150,10 @@ export default function DashboardAdminPage() {
   useEffect(() => {
     if (overview && !error) fetchAdmins();
   }, [overview, error, locale]);
+
+  useEffect(() => {
+    if (overview && !error) fetchAdminServers();
+  }, [overview, error, adminServersFilter, adminServersUserId, locale]);
 
   async function addAdminByEmail() {
     const token = getStoredToken();
@@ -343,6 +353,80 @@ export default function DashboardAdminPage() {
       setUserSearchError("Failed to set tier");
     } finally {
       setSettingTierUserId(null);
+    }
+  }
+
+  async function fetchAdminServers() {
+    const token = getStoredToken();
+    if (!token) return;
+    setAdminServersLoading(true);
+    try {
+      const params = new URLSearchParams();
+      if (adminServersFilter === "trash") params.set("trashed", "1");
+      if (adminServersUserId.trim()) params.set("userId", adminServersUserId.trim());
+      const r = await fetch(api(`/api/admin/servers${params.toString() ? `?${params}` : ""}`), {
+        headers: { Authorization: `Bearer ${token}` },
+      });
+      if (r.status === 401) {
+        clearStoredAuth();
+        router.replace(getPath("login", locale));
+        return;
+      }
+      if (r.status === 403) return;
+      const data = await responseJson(r, { servers: [] });
+      setAdminServers(data.servers ?? []);
+    } catch {
+      setAdminServers([]);
+    } finally {
+      setAdminServersLoading(false);
+    }
+  }
+
+  async function adminServerTrash(serverId: string) {
+    const token = getStoredToken();
+    if (!token) return;
+    setAdminServerActionId(serverId);
+    try {
+      const r = await fetch(api(`/api/admin/servers/${serverId}`), {
+        method: "PATCH",
+        headers: { "Content-Type": "application/json", Authorization: `Bearer ${token}` },
+        body: JSON.stringify({ trashed: true }),
+      });
+      if (r.ok) fetchAdminServers();
+    } finally {
+      setAdminServerActionId(null);
+    }
+  }
+
+  async function adminServerRestore(serverId: string) {
+    const token = getStoredToken();
+    if (!token) return;
+    setAdminServerActionId(serverId);
+    try {
+      const r = await fetch(api(`/api/admin/servers/${serverId}`), {
+        method: "PATCH",
+        headers: { "Content-Type": "application/json", Authorization: `Bearer ${token}` },
+        body: JSON.stringify({ restoreFromTrash: true }),
+      });
+      if (r.ok) fetchAdminServers();
+    } finally {
+      setAdminServerActionId(null);
+    }
+  }
+
+  async function adminServerDelete(serverId: string) {
+    if (!confirm("Permanently delete this server and all its backups? This cannot be undone.")) return;
+    const token = getStoredToken();
+    if (!token) return;
+    setAdminServerActionId(serverId);
+    try {
+      const r = await fetch(api(`/api/admin/servers/${serverId}`), {
+        method: "DELETE",
+        headers: { Authorization: `Bearer ${token}` },
+      });
+      if (r.ok) fetchAdminServers();
+    } finally {
+      setAdminServerActionId(null);
     }
   }
 
@@ -654,6 +738,122 @@ export default function DashboardAdminPage() {
               )}
               {managedUsers.length === 0 && !userSearchLoading && (userSearchQuery.trim() || managedUsers.length === 0) && overview && (
                 <p className="text-sm text-muted-foreground">Search by email or username, or leave empty and click Find to list recent users.</p>
+              )}
+            </div>
+          </div>
+
+          <div className="rounded-xl border border-border bg-card overflow-hidden">
+            <div className="px-4 py-3 border-b border-border">
+              <h2 className="font-semibold text-foreground flex items-center gap-2">
+                <SafeIcon><Server className="h-4 w-4" /></SafeIcon>
+                Server management
+              </h2>
+              <p className="text-xs text-muted-foreground mt-0.5">
+                Browse and manage any user&apos;s servers. Trash / restore / permanently delete. Items in trash auto-delete after 30 days.
+              </p>
+            </div>
+            <div className="p-4 space-y-4">
+              <div className="flex flex-wrap items-center gap-2">
+                <select
+                  value={adminServersFilter}
+                  onChange={(e) => setAdminServersFilter(e.target.value as "active" | "trash")}
+                  className="rounded-lg border border-border bg-background px-3 py-2 text-sm"
+                  aria-label="Filter"
+                >
+                  <option value="active">Active servers</option>
+                  <option value="trash">Trash</option>
+                </select>
+                <input
+                  type="text"
+                  value={adminServersUserId}
+                  onChange={(e) => setAdminServersUserId(e.target.value)}
+                  placeholder="Filter by user ID"
+                  className="rounded-lg border border-border bg-background px-3 py-2 text-sm min-w-[180px]"
+                  aria-label="User ID filter"
+                />
+                <Button
+                  type="button"
+                  variant="secondary"
+                  size="sm"
+                  onClick={() => fetchAdminServers()}
+                  disabled={adminServersLoading}
+                >
+                  <SafeIcon><RefreshCw className="h-3.5 w-3.5" /></SafeIcon>
+                  {adminServersLoading ? "…" : "Refresh"}
+                </Button>
+              </div>
+              {adminServers.length > 0 ? (
+                <div className="overflow-x-auto rounded-lg border border-border">
+                  <table className="w-full text-sm">
+                    <thead>
+                      <tr className="border-b border-border bg-muted/30">
+                        <th className="text-left px-4 py-2.5 font-medium text-foreground">User</th>
+                        <th className="text-left px-4 py-2.5 font-medium text-foreground">Server name</th>
+                        <th className="text-left px-4 py-2.5 font-medium text-muted-foreground">Host ID</th>
+                        <th className="text-left px-4 py-2.5 font-medium text-muted-foreground">Backups</th>
+                        <th className="text-left px-4 py-2.5 font-medium text-muted-foreground">Trashed at</th>
+                        <th className="text-left px-4 py-2.5 font-medium text-foreground">Actions</th>
+                      </tr>
+                    </thead>
+                    <tbody>
+                      {adminServers.map((s) => (
+                        <tr key={s.id} className="border-b border-border/80 hover:bg-muted/20">
+                          <td className="px-4 py-2.5 text-foreground text-xs">{s.userEmail}</td>
+                          <td className="px-4 py-2.5 font-medium text-foreground">{s.name || "Unnamed"}</td>
+                          <td className="px-4 py-2.5 text-muted-foreground font-mono text-xs">{s.hostId}</td>
+                          <td className="px-4 py-2.5 text-muted-foreground">{s.backupCount}</td>
+                          <td className="px-4 py-2.5 text-muted-foreground text-xs">
+                            {s.trashedAt ? new Date(s.trashedAt).toLocaleString() : "—"}
+                          </td>
+                          <td className="px-4 py-2.5 flex flex-wrap items-center gap-2">
+                            {adminServersFilter === "active" ? (
+                              <Button
+                                type="button"
+                                variant="ghost"
+                                size="sm"
+                                className="text-xs text-amber-600 hover:text-amber-700"
+                                onClick={() => adminServerTrash(s.id)}
+                                disabled={adminServerActionId === s.id}
+                              >
+                                <SafeIcon><Trash2 className="h-3.5 w-3.5" /></SafeIcon>
+                                {adminServerActionId === s.id ? "…" : "Move to trash"}
+                              </Button>
+                            ) : (
+                              <>
+                                <Button
+                                  type="button"
+                                  variant="ghost"
+                                  size="sm"
+                                  className="text-xs text-emerald-600 hover:text-emerald-700"
+                                  onClick={() => adminServerRestore(s.id)}
+                                  disabled={adminServerActionId === s.id}
+                                >
+                                  <SafeIcon><RotateCcw className="h-3.5 w-3.5" /></SafeIcon>
+                                  {adminServerActionId === s.id ? "…" : "Restore"}
+                                </Button>
+                                <Button
+                                  type="button"
+                                  variant="ghost"
+                                  size="sm"
+                                  className="text-xs text-destructive"
+                                  onClick={() => adminServerDelete(s.id)}
+                                  disabled={adminServerActionId === s.id}
+                                >
+                                  <SafeIcon><Trash2 className="h-3.5 w-3.5" /></SafeIcon>
+                                  {adminServerActionId === s.id ? "…" : "Delete permanently"}
+                                </Button>
+                              </>
+                            )}
+                          </td>
+                        </tr>
+                      ))}
+                    </tbody>
+                  </table>
+                </div>
+              ) : (
+                <p className="text-sm text-muted-foreground">
+                  {adminServersLoading ? "Loading servers…" : adminServersFilter === "trash" ? "No servers in trash." : "No active servers. Filter by user ID if needed."}
+                </p>
               )}
             </div>
           </div>

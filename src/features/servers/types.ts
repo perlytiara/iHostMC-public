@@ -18,6 +18,8 @@ export interface ServerConfig {
   port: number;
   java_path: string | null;
   path: string;
+  /** ISO timestamp when moved to trash. Server in trash auto-deletes after 30 days. */
+  trashed_at?: string | null;
 }
 
 export interface CreateServerInput {

@@ -352,15 +352,44 @@ pub struct CreateServerInput {
     pub favicon_b64: Option<String>,
 }
 
-/// Deletes a server: removes it from the list, persists servers.json, and fully removes
-/// the server's data directory so no files or folders remain.
-/// Kills orphaned Java processes holding locks on the directory before deleting.
+/// Move server to trash (soft delete). Server stays in list with trashed_at set.
+#[tauri::command]
+pub fn trash_server(id: String) -> Result<(), String> {
+    if process::is_running() {
+        if process::running_server_id().as_deref() == Some(id.as_str()) {
+            return Err("Stop the running server first".to_string());
+        }
+    }
+    if server::trash_server(&id) {
+        Ok(())
+    } else {
+        Err("Server not found".to_string())
+    }
+}
+
+/// Restore server from trash.
+#[tauri::command]
+pub fn restore_server(id: String) -> Result<(), String> {
+    if server::restore_server(&id) {
+        Ok(())
+    } else {
+        Err("Server not found".to_string())
+    }
+}
+
+/// Permanently deletes a server: removes from list, deletes data directory.
+/// Server must be in trash first. Use trash_server to move to trash.
 #[tauri::command]
 pub fn delete_server(id: String) -> Result<(), String> {
     if process::is_running() {
         if process::running_server_id().as_deref() == Some(id.as_str()) {
             return Err("Stop the running server first".to_string());
         }
+    }
+    let cfg = server::get_server(&id);
+    let is_trashed = cfg.as_ref().and_then(|c| c.trashed_at.as_ref()).is_some();
+    if !is_trashed {
+        return Err("Move server to trash first, then permanently delete".to_string());
     }
     if server::remove_server(&id) {
         let dir = server::server_dir(&id);
@@ -481,6 +510,9 @@ pub async fn start_server(
     run_in_background: Option<bool>,
 ) -> Result<(), String> {
     let config = server::get_server(&id).ok_or("Server not found")?;
+    if config.trashed_at.is_some() {
+        return Err("Cannot start a server in trash. Restore it first.".to_string());
+    }
     let detach = run_in_background.unwrap_or(false);
 
     let emit_log = |msg: &str| {

@@ -757,10 +757,42 @@ export const api = {
     });
   },
 
-  /** List sync servers (what the website shows as "Your servers"). */
-  async getSyncServers(token: string): Promise<SyncServerInfo[]> {
-    const list = await request<SyncServerInfo[]>("/api/sync/servers", { token });
+  /** List sync servers (what the website shows as "Your servers"). trashed=true returns trashed servers. */
+  async getSyncServers(token: string, options?: { trashed?: boolean }): Promise<SyncServerInfo[]> {
+    const qs = options?.trashed ? "?trashed=1" : "";
+    const list = await request<SyncServerInfo[]>(`/api/sync/servers${qs}`, { token });
     return Array.isArray(list) ? list : [];
+  },
+
+  /** Move a sync server to trash (soft delete). */
+  async trashSyncServer(token: string, serverId: string): Promise<{ ok: boolean }> {
+    return request(`/api/sync/servers/${encodeURIComponent(serverId)}`, {
+      method: "PATCH",
+      token,
+      body: JSON.stringify({ trashed: true }),
+    });
+  },
+
+  /** Restore a sync server from trash. */
+  async restoreSyncServer(token: string, serverId: string): Promise<{ ok: boolean }> {
+    return request(`/api/sync/servers/${encodeURIComponent(serverId)}`, {
+      method: "PATCH",
+      token,
+      body: JSON.stringify({ restoreFromTrash: true }),
+    });
+  },
+
+  /** Permanently delete a sync server (must be in trash). */
+  async permanentDeleteSyncServer(token: string, serverId: string): Promise<{ ok: boolean }> {
+    return request(`/api/sync/servers/${encodeURIComponent(serverId)}`, {
+      method: "DELETE",
+      token,
+    });
+  },
+
+  /** Purge trashed sync servers older than 30 days. */
+  async purgeSyncTrash(token: string): Promise<{ ok: boolean; purged: number }> {
+    return request("/api/sync/trash/purge", { method: "POST", token });
   },
 
   /** Get backup storage report: total size, mini/big split, files-too-big count, storage limit, tier (for usage in app). */
@@ -1065,6 +1097,8 @@ export interface SyncServerInfo {
   iterationIntervalHours?: number | null;
   /** Save tier for automatic iterations (snapshot | structural | full). */
   iterationSaveTier?: "snapshot" | "structural" | "full" | null;
+  /** When set, server is in trash (soft-deleted). */
+  trashedAt?: string | null;
 }
 
 /** One synced file as returned by GET /api/sync/servers/:id/files */
