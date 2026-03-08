@@ -752,12 +752,6 @@ export function ServerList({
                               <Play className="h-3.5 w-3.5" />
                             )}
                           </Button>
-                          <Button size="icon" variant="ghost" className="h-7 w-7 text-muted-foreground hover:text-foreground" onClick={(e) => { e.stopPropagation(); requestArchiveServer(s); }} disabled={runningId === s.id || startingId === s.id} title={t("servers.contextArchive")}>
-                            <Archive className="h-3.5 w-3.5" />
-                          </Button>
-                          <Button size="icon" variant="ghost" className="h-7 w-7 text-muted-foreground hover:text-destructive" onClick={(e) => { e.stopPropagation(); requestDeleteServer(s); }} disabled={runningId === s.id || startingId === s.id} title={t("servers.contextMoveToTrash")}>
-                            <Trash2 className="h-3.5 w-3.5" />
-                          </Button>
                         </div>
                         {runningId === s.id && (
                           <span className="ml-1.5 h-2 w-2 rounded-full bg-primary animate-pulse" />
