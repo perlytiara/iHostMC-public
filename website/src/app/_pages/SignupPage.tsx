@@ -4,7 +4,7 @@ import { useState, useMemo, useEffect } from "react";
 import { useTranslations } from "next-intl";
 import { Link, useRouter, getLocalizedPath } from "@/i18n/navigation";
 import { useLocale } from "next-intl";
-import { getApiBaseUrl } from "@/lib/api";
+import { getApiBaseUrl, responseJson } from "@/lib/api";
 import { hasDevViewCookie } from "@/lib/dev-view";
 import { getPath, type Locale } from "@/i18n/pathnames";
 import { signupSchema } from "@/lib/validations/auth";
@@ -41,8 +41,8 @@ export default function SignupPage() {
     const base = getApiBaseUrl();
     const providersUrl = base ? `${base}/api/auth/providers` : "/api/auth/providers";
     fetch(providersUrl)
-      .then((r) => r.json())
-      .then((data: { providers?: string[] }) => setOauthProviders(data?.providers ?? []))
+      .then((r) => responseJson(r, { providers: [] as string[] }))
+      .then((data) => setOauthProviders(data?.providers ?? []))
       .catch(() => setOauthProviders([]));
   }, []);
 

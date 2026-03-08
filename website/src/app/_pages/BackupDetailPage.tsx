@@ -5,7 +5,7 @@ import { Link, useRouter } from "@/i18n/navigation";
 import type { ReactNode } from "react";
 import { useLocale } from "next-intl";
 import { getPath, getCloudServerDetailPath, type Locale } from "@/i18n/pathnames";
-import { getApiBaseUrl, getStoredToken, clearStoredAuth } from "@/lib/api";
+import { getApiBaseUrl, getStoredToken, clearStoredAuth, responseJson } from "@/lib/api";
 import { formatSize, getBackupTier, getTierLabel, getTierDescription, getCustomBackupTags, type BackupItem, type BackupMetadata, type SnapshotFileTreeNode } from "@/lib/cloud";
 import {
   ChevronLeft,
@@ -352,8 +352,10 @@ export default function BackupDetailPage({ backupId }: BackupDetailPageProps) {
           router.replace(getPath("login", locale));
           return null;
         }
-        if (!r.ok) return r.json().then((d: { error?: string }) => { throw new Error(d?.error ?? "Failed to load"); });
-        return r.json();
+        if (!r.ok) {
+          return responseJson(r, { error: "Failed to load" }).then((d) => { throw new Error(d?.error ?? "Failed to load"); });
+        }
+        return responseJson(r, null as unknown as BackupItem);
       })
       .then((data: BackupItem | null) => {
         setBackup(data ?? null);

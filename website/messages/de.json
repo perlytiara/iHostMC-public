@@ -7,6 +7,7 @@
     "contribute": "Mitwirken",
     "pricing": "Preise",
     "signIn": "Anmelden",
+    "signOut": "Abmelden",
     "signUp": "Registrieren",
     "dashboard": "Dashboard",
     "app": "App",
@@ -91,6 +92,8 @@
     "viewPricing": "Preise ansehen"
   },
   "auth": {
+    "sessionExpired": "Ihre Sitzung ist abgelaufen. Bitte melden Sie sich erneut an.",
+    "invalidSession": "Ihre Sitzung ist nicht mehr gültig. Bitte melden Sie sich erneut an.",
     "login": "Anmelden",
     "signup": "Konto erstellen",
     "email": "E-Mail",

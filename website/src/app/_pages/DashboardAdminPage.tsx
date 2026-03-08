@@ -4,7 +4,7 @@ import { useEffect, useState } from "react";
 import { useRouter } from "@/i18n/navigation";
 import { getPath, type Locale } from "@/i18n/pathnames";
 import { useLocale } from "next-intl";
-import { getApiBaseUrl, getStoredToken, clearStoredAuth } from "@/lib/api";
+import { getApiBaseUrl, getStoredToken, clearStoredAuth, responseJson } from "@/lib/api";
 import { DashboardLoadingBlock } from "@/components/DashboardLoadingBlock";
 import { RefreshCw, ShieldAlert, Search, Users } from "lucide-react";
 import { SafeIcon } from "@/components/SafeIcon";
@@ -79,7 +79,7 @@ export default function DashboardAdminPage() {
           return null;
         }
         if (!r.ok) throw new Error("Failed to load");
-        return r.json() as Promise<Overview>;
+        return responseJson(r, null as unknown as Overview);
       })
       .then((data) => {
         if (data) setOverview(data);
@@ -154,7 +154,7 @@ export default function DashboardAdminPage() {
         return;
       }
       if (!r.ok) throw new Error("Failed to load");
-      const data = (await r.json()) as { users: ManagedUser[] };
+      const data = await responseJson(r, { users: [] });
       setManagedUsers(data.users ?? []);
     } catch {
       setUserSearchError("Failed to load users");
@@ -184,7 +184,7 @@ export default function DashboardAdminPage() {
         return;
       }
       if (!r.ok) {
-        const err = (await r.json()) as { error?: string };
+        const err = await responseJson(r, { error: "Failed to set tier" });
         setUserSearchError(err?.error ?? "Failed to set tier");
         return;
       }

@@ -4,7 +4,7 @@ import { useEffect, useState, useCallback } from "react";
 import { Link } from "@/i18n/navigation";
 import { getPath, getDashboardServerDetailPath } from "@/i18n/pathnames";
 import { useLocale } from "next-intl";
-import { getApiBaseUrl, getStoredToken } from "@/lib/api";
+import { getApiBaseUrl, getStoredToken, responseJson } from "@/lib/api";
 import { DashboardLoadingBlock } from "@/components/DashboardLoadingBlock";
 import { DEFAULT_PRODUCT_SLUG } from "@/lib/products";
 import { DOMAINS } from "@/lib/domains";
@@ -153,7 +153,7 @@ export default function DashboardServersPage({ pathSegments = [] }: DashboardSer
     if (!token) return;
     const base = getApiBaseUrl();
     fetch(`${base}/api/sync/servers`, { headers: { Authorization: `Bearer ${token}` } })
-      .then((r) => r.ok ? r.json() : [])
+      .then((r) => responseJson(r, []))
       .then((d) => { setServers(Array.isArray(d) ? d : []); })
       .catch(() => {});
   }, []);
@@ -163,7 +163,7 @@ export default function DashboardServersPage({ pathSegments = [] }: DashboardSer
     if (!token) { setLoading(false); return; }
     const base = getApiBaseUrl();
     fetch(`${base}/api/sync/servers`, { headers: { Authorization: `Bearer ${token}` } })
-      .then((r) => r.ok ? r.json() : [])
+      .then((r) => responseJson(r, []))
       .then((d) => { setServers(Array.isArray(d) ? d : []); })
       .catch(() => {})
       .finally(() => setLoading(false));
@@ -197,8 +197,8 @@ export default function DashboardServersPage({ pathSegments = [] }: DashboardSer
     setSelectedId(serverId);
     setFileContent(null);
     const [filesRes, summaryRes] = await Promise.all([
-      fetch(`${base}/api/sync/servers/${serverId}/files?limit=2500`, { headers: auth }).then((r) => r.ok ? r.json() : { files: [] }),
-      fetch(`${base}/api/sync/servers/${serverId}/summary`, { headers: auth }).then((r) => r.ok ? r.json() : null),
+      fetch(`${base}/api/sync/servers/${serverId}/files?limit=2500`, { headers: auth }).then((r) => responseJson(r, { files: [] })),
+      fetch(`${base}/api/sync/servers/${serverId}/summary`, { headers: auth }).then((r) => responseJson(r, null)),
     ]);
     setFiles(filesRes.files ?? []);
     setSummary(summaryRes);

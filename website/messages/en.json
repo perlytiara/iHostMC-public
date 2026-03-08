@@ -7,6 +7,7 @@
     "contribute": "Contribute",
     "pricing": "Pricing",
     "signIn": "Sign in",
+    "signOut": "Sign out",
     "signUp": "Sign up",
     "dashboard": "Dashboard",
     "app": "App",
@@ -111,6 +112,8 @@
     "viewPricing": "View pricing"
   },
   "auth": {
+    "sessionExpired": "Your session expired. Please sign in again.",
+    "invalidSession": "Your session is no longer valid. Please sign in again.",
     "login": "Sign in",
     "signUp": "Sign up",
     "signup": "Create account",

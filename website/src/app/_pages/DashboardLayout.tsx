@@ -4,7 +4,14 @@ import React, { useId, useEffect, useState } from "react";
 import { useRouter, usePathname, Link } from "@/i18n/navigation";
 import { useSearchParams } from "next/navigation";
 import { useLocale } from "next-intl";
-import { getStoredToken } from "@/lib/api";
+import { useTranslations } from "next-intl";
+import { getStoredToken, getApiBaseUrl } from "@/lib/api";
+import {
+  validateSession,
+  sanitizeAndRedirectToLogin,
+  performFullLogout,
+  REVALIDATE_INTERVAL,
+} from "@/lib/auth-session";
 import { getPath, type Locale } from "@/i18n/pathnames";
 import { routing } from "@/i18n/routing";
 import {
@@ -17,8 +24,8 @@ import {
   ChevronDown,
   Tag,
   Shield,
+  LogOut,
 } from "lucide-react";
-import { getApiBaseUrl } from "@/lib/api";
 import { AppLogo } from "@/components/AppLogo";
 import { SafeIcon } from "@/components/SafeIcon";
 import {
@@ -80,7 +87,9 @@ function NavLinks({
   );
 }
 
+
 export default function DashboardLayout(props: { children: React.ReactNode }) {
+  const t = useTranslations("nav");
   const router = useRouter();
   const pathname = usePathname();
   const searchParams = useSearchParams();
@@ -90,45 +99,75 @@ export default function DashboardLayout(props: { children: React.ReactNode }) {
   const [mobileMenuOpen, setMobileMenuOpen] = useState(false);
   const [appHost, setAppHost] = useState("app.ihost.one");
   const [isAdmin, setIsAdmin] = useState(false);
+  const [tokenValidated, setTokenValidated] = useState(false);
 
   useEffect(() => {
     if (typeof window !== "undefined") setAppHost(window.location.host);
   }, []);
 
+  const loginPath = getPath("login", locale);
+
+  // Validate token on mount; if stale/invalid, sanitize and redirect to login with reason
   useEffect(() => {
     const token = getStoredToken();
-    const base = getApiBaseUrl();
-    if (!token || !base) return;
-    fetch(`${base}/api/admin/me`, { headers: { Authorization: `Bearer ${token}` } })
-      .then((r) => {
-        if (r.ok) return r.json() as Promise<{ admin?: boolean }>;
-        return { admin: false };
-      })
-      .then((data) => setIsAdmin(!!data?.admin))
-      .catch(() => setIsAdmin(false));
-  }, []);
-
-  // Token gate: synchronous, instant — no async fetch, no flash.
-  // Child pages (DashboardPage, etc.) handle the actual API calls and 401 redirects.
-  useEffect(() => {
-    if (!getStoredToken()) {
-      router.replace(getPath("login", locale));
+    if (!token) {
+      setTokenValidated(true);
+      return;
     }
-  }, [pathname, router, locale]);
+    validateSession().then((result) => {
+      if (!result.valid) {
+        sanitizeAndRedirectToLogin(loginPath, "session_expired");
+        return;
+      }
+      if (result.valid && "isAdmin" in result) setIsAdmin(result.isAdmin);
+      setTokenValidated(true);
+    });
+  }, [loginPath]);
+
+  useEffect(() => {
+    if (!tokenValidated) return;
+    if (!getStoredToken()) {
+      router.replace(loginPath);
+    }
+  }, [pathname, router, locale, tokenValidated, loginPath]);
 
   useEffect(() => {
     if (searchParams.get("signed_in") === "app") {
       setShowSignedInBanner(true);
       const url = new URL(window.location.href);
       url.searchParams.delete("signed_in");
-      const replace = url.pathname + url.search;
-      window.history.replaceState(null, "", replace);
+      window.history.replaceState(null, "", url.pathname + url.search);
     }
   }, [searchParams]);
 
   useEffect(() => {
     setMobileMenuOpen(false);
   }, [pathname]);
+
+  // On focus: re-validate and keep cookies in sync; if 401, sanitize and redirect with "session expired"
+  useEffect(() => {
+    const onFocus = () => {
+      if (!getStoredToken()) return;
+      validateSession().then((result) => {
+        if (!result.valid) sanitizeAndRedirectToLogin(loginPath, "session_expired");
+        else if (result.valid && "isAdmin" in result) setIsAdmin(result.isAdmin);
+      });
+    };
+    window.addEventListener("focus", onFocus);
+    return () => window.removeEventListener("focus", onFocus);
+  }, [loginPath]);
+
+  // Periodic re-validation so long-lived tabs don't stay "logged in" with an expired token
+  useEffect(() => {
+    const id = setInterval(() => {
+      if (typeof document === "undefined" || document.visibilityState !== "visible") return;
+      if (!getStoredToken()) return;
+      validateSession().then((result) => {
+        if (!result.valid) sanitizeAndRedirectToLogin(loginPath, "session_expired");
+      });
+    }, REVALIDATE_INTERVAL);
+    return () => clearInterval(id);
+  }, [loginPath]);
 
   const navItems = isAdmin ? NAV_ADMIN : NAV_BASE;
 
@@ -199,6 +238,17 @@ export default function DashboardLayout(props: { children: React.ReactNode }) {
               </DropdownMenuItem>
             ))}
             <div className="my-1 border-t border-border" />
+            <DropdownMenuItem
+              onSelect={() => {
+                setMobileMenuOpen(false);
+                performFullLogout();
+              }}
+              className="flex cursor-pointer items-center gap-2 text-muted-foreground hover:bg-destructive/10 hover:text-destructive focus:bg-destructive/10 focus:text-destructive"
+            >
+              <SafeIcon><LogOut className="h-4 w-4" aria-hidden /></SafeIcon>
+              {t("signOut")}
+            </DropdownMenuItem>
+            <div className="my-1 border-t border-border" />
             <div className="px-2 py-1.5 text-xs text-muted-foreground" aria-hidden>
               {appHost}
             </div>
@@ -213,8 +263,18 @@ export default function DashboardLayout(props: { children: React.ReactNode }) {
         className="hidden md:flex md:w-56 lg:w-60 md:flex-shrink-0 md:flex-col z-30 border-r border-border bg-card/50"
         aria-label="Dashboard navigation"
       >
-        <nav className="flex-1 overflow-y-auto p-3 pt-4">
+        <nav className="flex-1 overflow-y-auto p-3 pt-4 flex flex-col">
           <NavLinks locale={locale} navItems={navItems} isActive={isActive} />
+          <div className="mt-auto border-t border-border pt-3">
+            <button
+              type="button"
+              onClick={() => performFullLogout()}
+              className="flex w-full items-center gap-3 rounded-lg px-3 py-2.5 text-sm font-medium text-muted-foreground hover:bg-destructive/10 hover:text-destructive transition-colors"
+            >
+              <SafeIcon><LogOut className="h-4 w-4 shrink-0" aria-hidden /></SafeIcon>
+              {t("signOut")}
+            </button>
+          </div>
         </nav>
       </aside>
 
@@ -239,13 +299,26 @@ export default function DashboardLayout(props: { children: React.ReactNode }) {
                 Dashboard
               </Link>
             </div>
-            <nav className="p-3">
+            <nav className="p-3 flex flex-col">
               <NavLinks
                 locale={locale}
                 navItems={navItems}
                 isActive={isActive}
                 onNavigate={() => setMobileMenuOpen(false)}
               />
+              <div className="mt-auto border-t border-border pt-3">
+                <button
+                  type="button"
+                  onClick={() => {
+                    setMobileMenuOpen(false);
+                    performFullLogout();
+                  }}
+                  className="flex w-full items-center gap-3 rounded-lg px-3 py-2.5 text-sm font-medium text-muted-foreground hover:bg-destructive/10 hover:text-destructive transition-colors"
+                >
+                  <SafeIcon><LogOut className="h-4 w-4 shrink-0" aria-hidden /></SafeIcon>
+                  {t("signOut")}
+                </button>
+              </div>
             </nav>
           </aside>
         </>

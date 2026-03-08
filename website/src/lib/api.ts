@@ -10,6 +10,21 @@ const BASE =
 /** Backend port when running API on same host (e.g. local dev). */
 const DEFAULT_API_PORT = "3010";
 
+/**
+ * Parse response body as JSON without throwing on HTML/empty/invalid (avoids "JSON.parse: unexpected character").
+ * Use for any fetch() where the server might return an error page or non-JSON.
+ */
+export async function responseJson<T>(res: Response, fallback: T): Promise<T> {
+  const text = await res.text();
+  if (!text?.trim()) return fallback;
+  try {
+    const parsed = JSON.parse(text) as T;
+    return parsed ?? fallback;
+  } catch {
+    return fallback;
+  }
+}
+
 export function getApiBaseUrl(): string {
   if (USE_PROXY) return "";
   if (BASE) return BASE;
@@ -109,7 +124,7 @@ export async function sendAuthToDevAppAndRedirect(
   try {
     const createRes = await fetch(createUrl, { method: "POST" });
     if (!createRes.ok) return;
-    const createData = (await createRes.json()) as { session_id?: string };
+    const createData = await responseJson(createRes, {} as { session_id?: string });
     const sessionId = createData?.session_id?.trim();
     if (!sessionId) return;
     await fetch(registerUrl, {

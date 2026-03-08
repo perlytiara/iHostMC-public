@@ -7,6 +7,7 @@
     "contribute": "Contribuer",
     "pricing": "Tarifs",
     "signIn": "Connexion",
+    "signOut": "Se déconnecter",
     "signUp": "Inscription",
     "dashboard": "Tableau de bord",
     "app": "App",
@@ -91,6 +92,8 @@
     "viewPricing": "Voir les tarifs"
   },
   "auth": {
+    "sessionExpired": "Votre session a expiré. Veuillez vous reconnecter.",
+    "invalidSession": "Votre session n'est plus valide. Veuillez vous reconnecter.",
     "login": "Connexion",
     "signup": "Créer un compte",
     "email": "E-mail",

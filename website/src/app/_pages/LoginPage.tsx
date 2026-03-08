@@ -6,7 +6,7 @@ import { useRouter } from "@/i18n/navigation";
 import { useLocale, useTranslations } from "next-intl";
 import { Link } from "@/i18n/navigation";
 import { getPath, type Locale } from "@/i18n/pathnames";
-import { getApiBaseUrl, getStoredAuth, registerSessionAndRedirect } from "@/lib/api";
+import { getApiBaseUrl, getStoredAuth, registerSessionAndRedirect, responseJson } from "@/lib/api";
 import { hasDevViewCookie } from "@/lib/dev-view";
 import { loginSchema } from "@/lib/validations/auth";
 import { RECAPTCHA_SITE_KEY } from "@/lib/recaptcha";
@@ -28,6 +28,7 @@ function LoginContent() {
   const locale = useLocale() as Locale;
   const searchParams = useSearchParams();
   const sessionId = useMemo(() => searchParams.get("session")?.trim() ?? null, [searchParams]);
+  const redirectReason = useMemo(() => searchParams.get("reason") ?? null, [searchParams]);
   const [email, setEmail] = useState("");
   const [password, setPassword] = useState("");
   const [error, setError] = useState("");
@@ -43,8 +44,8 @@ function LoginContent() {
     const authBase = base || "";
     const providersUrl = authBase ? `${authBase}/api/auth/providers` : "/api/auth/providers";
     fetch(providersUrl)
-      .then((r) => r.json())
-      .then((data: { providers?: string[] }) => setOauthProviders(data?.providers ?? []))
+      .then((r) => responseJson(r, { providers: [] as string[] }))
+      .then((data) => setOauthProviders(data?.providers ?? []))
       .catch(() => setOauthProviders([]));
   }, []);
 
@@ -116,7 +117,7 @@ function LoginContent() {
           credentials: "include",
         });
         if (previewRes.ok) {
-          const body = await previewRes.json().catch(() => ({}));
+          const body = await responseJson(previewRes, { ok: false });
           adminPreviewSet = body?.ok === true;
         }
       } catch {
@@ -183,9 +184,17 @@ function LoginContent() {
     );
   }
 
+  const sessionMessage =
+    redirectReason === "session_expired" ? t("sessionExpired") : redirectReason === "invalid" ? t("invalidSession") : null;
+
   return (
     <div className="min-h-[60vh] flex flex-col items-center justify-center px-6 py-12">
       <div className="w-full max-w-[400px] rounded-2xl border border-border/80 bg-card/60 shadow-sm backdrop-blur-sm p-6 sm:p-8 space-y-6">
+        {sessionMessage && (
+          <div className="rounded-lg border border-amber-500/40 bg-amber-500/10 text-amber-800 dark:text-amber-200 text-sm px-4 py-3 text-center">
+            {sessionMessage}
+          </div>
+        )}
         <div className="text-center space-y-1">
           <h1 className="text-xl font-semibold tracking-tight">{t("login")}</h1>
           <p className="text-sm text-muted-foreground">Sign in to your iHostMC account</p>

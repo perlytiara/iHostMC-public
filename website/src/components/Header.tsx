@@ -5,7 +5,9 @@ import { useTranslations } from "next-intl";
 import { Link, usePathname, useRouter, usePathnameKey, getLocalizedPath } from "@/i18n/navigation";
 import { useLocale } from "next-intl";
 import { routing } from "@/i18n/routing";
-import { getStoredToken, clearStoredAuth } from "@/lib/api";
+import { getPath, type Locale } from "@/i18n/pathnames";
+import { getStoredToken, responseJson } from "@/lib/api";
+import { validateSession, sanitizeAndRedirectToLogin, performFullLogout } from "@/lib/auth-session";
 import { useTheme } from "@/components/ThemeProvider";
 import { AppLogo } from "@/components/AppLogo";
 import { SafeIcon } from "@/components/SafeIcon";
@@ -89,10 +91,29 @@ export function Header() {
   useEffect(() => {
     if (!UNDER_CONSTRUCTION) return;
     fetch("/api/admin-preview", { credentials: "include" })
-      .then((r) => r.json())
+      .then((r) => responseJson(r, { admin: false }))
       .then((data) => setIsAdmin(data?.admin === true))
       .catch(() => setIsAdmin(false));
   }, []);
+
+  const loginPath = getPath("login", locale as Locale);
+
+  // On focus: re-validate session; if expired, sanitize and redirect to login with "session expired"
+  useEffect(() => {
+    const onFocus = () => {
+      if (!getStoredToken()) return;
+      validateSession().then((result) => {
+        if (!result.valid) {
+          setIsLoggedIn(false);
+          sanitizeAndRedirectToLogin(loginPath, "session_expired");
+        } else if (result.valid && result.isAdmin) {
+          setIsAdmin(true);
+        }
+      });
+    };
+    window.addEventListener("focus", onFocus);
+    return () => window.removeEventListener("focus", onFocus);
+  }, [loginPath]);
 
   const navLinks = UNDER_CONSTRUCTION ? (devViewOn ? FULL_NAV_LINKS : SIMPLE_NAV_LINKS) : FULL_NAV_LINKS;
 
@@ -118,12 +139,7 @@ export function Header() {
   const logout = () => {
     setMenuOpen(false);
     setMobileNavOpen(false);
-    // Clear admin-preview cookie so logged-out users don't keep full-site access or see view toggle
-    fetch("/api/admin-preview", { method: "DELETE", credentials: "include" }).catch(() => {});
-    clearStoredAuth();
-    setIsLoggedIn(false);
-    // Full reload so all client state (e.g. cached auth) is cleared and logout is reliable
-    window.location.assign("/");
+    performFullLogout();
   };
 
   const closeMenus = () => {
