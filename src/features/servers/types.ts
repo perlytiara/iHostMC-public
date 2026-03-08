@@ -18,6 +18,8 @@ export interface ServerConfig {
   port: number;
   java_path: string | null;
   path: string;
+  /** Archived (hidden from active list, like AI advisor). */
+  archived?: boolean;
   /** ISO timestamp when moved to trash. Server in trash auto-deletes after 30 days. */
   trashed_at?: string | null;
 }

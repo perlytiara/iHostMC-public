@@ -764,6 +764,24 @@ export const api = {
     return Array.isArray(list) ? list : [];
   },
 
+  /** Archive sync server (hide from main list, like AI advisor). */
+  async archiveSyncServer(token: string, serverId: string): Promise<{ ok: boolean }> {
+    return request(`/api/sync/servers/${encodeURIComponent(serverId)}`, {
+      method: "PATCH",
+      token,
+      body: JSON.stringify({ archived: true }),
+    });
+  },
+
+  /** Unarchive sync server (restore to main list). */
+  async unarchiveSyncServer(token: string, serverId: string): Promise<{ ok: boolean }> {
+    return request(`/api/sync/servers/${encodeURIComponent(serverId)}`, {
+      method: "PATCH",
+      token,
+      body: JSON.stringify({ archived: false }),
+    });
+  },
+
   /** Move a sync server to trash (soft delete). */
   async trashSyncServer(token: string, serverId: string): Promise<{ ok: boolean }> {
     return request(`/api/sync/servers/${encodeURIComponent(serverId)}`, {

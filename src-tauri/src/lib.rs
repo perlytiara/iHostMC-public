@@ -41,6 +41,8 @@ pub fn run() {
             commands::list_servers,
             commands::get_server_ports,
             commands::create_server,
+            commands::archive_server,
+            commands::unarchive_server,
             commands::trash_server,
             commands::restore_server,
             commands::delete_server,

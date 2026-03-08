@@ -290,6 +290,7 @@ pub async fn create_server(app: AppHandle, config: CreateServerInput) -> Result<
         port,
         java_path: config.java_path,
         path: path.clone(),
+        archived: false,
         trashed_at: None,
     };
     server::add_server(server_config.clone());
@@ -351,6 +352,31 @@ pub struct CreateServerInput {
     pub motd: Option<String>,
     #[serde(default)]
     pub favicon_b64: Option<String>,
+}
+
+/// Archive server (hide from active list, like AI advisor).
+#[tauri::command]
+pub fn archive_server(id: String) -> Result<(), String> {
+    if process::is_running() {
+        if process::running_server_id().as_deref() == Some(id.as_str()) {
+            return Err("Stop the running server first".to_string());
+        }
+    }
+    if server::archive_server(&id) {
+        Ok(())
+    } else {
+        Err("Server not found".to_string())
+    }
+}
+
+/// Unarchive server (restore to active list).
+#[tauri::command]
+pub fn unarchive_server(id: String) -> Result<(), String> {
+    if server::unarchive_server(&id) {
+        Ok(())
+    } else {
+        Err("Server not found".to_string())
+    }
 }
 
 /// Move server to trash (soft delete). Server stays in list with trashed_at set.

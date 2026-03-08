@@ -61,7 +61,7 @@ export function useSyncServers(
     try {
       const now = new Date().toISOString();
       const currentServers = serversRef.current;
-      const activeServers = currentServers.filter((s) => !s.trashed_at);
+      const activeServers = currentServers.filter((s) => !s.trashed_at && !s.archived);
       const toSync = serverId
         ? activeServers.filter((s) => s.id === serverId)
         : activeServers;
@@ -121,7 +121,7 @@ export function useSyncServers(
   }, [token, refreshSynced]);
 
   useEffect(() => {
-    const active = servers.filter((s) => !s.trashed_at);
+    const active = servers.filter((s) => !s.trashed_at && !s.archived);
     if (options?.autoSyncOnLoad && token && active.length > 0 && !syncing) {
       syncNow();
     }
