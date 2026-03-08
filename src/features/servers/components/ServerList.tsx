@@ -896,7 +896,6 @@ export function ServerList({
                   )}
                 </div>
               )}
-            </div>
           </>
         )}
       </aside>
