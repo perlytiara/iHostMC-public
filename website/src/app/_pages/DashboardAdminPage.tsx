@@ -65,8 +65,11 @@ export default function DashboardAdminPage() {
   const [addAdminEmail, setAddAdminEmail] = useState("");
   const [addingAdmin, setAddingAdmin] = useState(false);
   const [removingAdminUserId, setRemovingAdminUserId] = useState<string | null>(null);
+  const [makingAdminUserId, setMakingAdminUserId] = useState<string | null>(null);
+  const [adminSuccessMessage, setAdminSuccessMessage] = useState<string | null>(null);
 
   const base = getApiBaseUrl();
+  const adminUserIds = new Set(admins.map((a) => a.userId));
   const api = (path: string) => (base ? `${base}${path}` : path);
 
   function fetchOverview() {
@@ -147,6 +150,7 @@ export default function DashboardAdminPage() {
     if (!token || !addAdminEmail.trim()) return;
     setAddingAdmin(true);
     setAdminsError(null);
+    setAdminSuccessMessage(null);
     try {
       const r = await fetch(api("/api/admin/admins"), {
         method: "POST",
@@ -166,12 +170,51 @@ export default function DashboardAdminPage() {
         setAdminsError((data as { error?: string }).error ?? "Failed to add admin");
         return;
       }
+      const addedEmail = (data as { email?: string }).email ?? addAdminEmail.trim();
       setAddAdminEmail("");
+      setAdminSuccessMessage(`${addedEmail} added as admin.`);
+      setTimeout(() => setAdminSuccessMessage(null), 5000);
       fetchAdmins();
     } catch {
       setAdminsError("Failed to add admin");
     } finally {
       setAddingAdmin(false);
+    }
+  }
+
+  async function addAdminByUserId(userId: string) {
+    const token = getStoredToken();
+    if (!token) return;
+    setMakingAdminUserId(userId);
+    setAdminsError(null);
+    setAdminSuccessMessage(null);
+    try {
+      const r = await fetch(api("/api/admin/admins"), {
+        method: "POST",
+        headers: {
+          "Content-Type": "application/json",
+          Authorization: `Bearer ${token}`,
+        },
+        body: JSON.stringify({ userId }),
+      });
+      if (r.status === 401) {
+        clearStoredAuth();
+        router.replace(getPath("login", locale));
+        return;
+      }
+      const data = await responseJson(r, { ok: false, email: "", userId: "" });
+      if (!r.ok) {
+        setAdminsError((data as { error?: string }).error ?? "Failed to add admin");
+        return;
+      }
+      const addedEmail = (data as { email?: string }).email ?? "User";
+      setAdminSuccessMessage(`${addedEmail} added as admin.`);
+      setTimeout(() => setAdminSuccessMessage(null), 5000);
+      fetchAdmins();
+    } catch {
+      setAdminsError("Failed to add admin");
+    } finally {
+      setMakingAdminUserId(null);
     }
   }
 
@@ -394,6 +437,14 @@ export default function DashboardAdminPage() {
                   {addingAdmin ? "…" : "Add admin"}
                 </Button>
               </div>
+              <p className="text-xs text-muted-foreground">
+                User must already have an account. Or find them in <strong>User management</strong> below and click &quot;Make admin&quot;.
+              </p>
+              {adminSuccessMessage && (
+                <p className="text-sm text-emerald-600 dark:text-emerald-400" role="status">
+                  {adminSuccessMessage}
+                </p>
+              )}
               {adminsError && (
                 <p className="text-sm text-destructive">{adminsError}</p>
               )}
@@ -556,8 +607,23 @@ export default function DashboardAdminPage() {
                           <td className="px-4 py-2.5 text-muted-foreground">{u.username ?? "—"}</td>
                           <td className="px-4 py-2.5">
                             <span className="rounded bg-muted px-2 py-0.5 font-medium text-foreground">{u.tierId}</span>
+                            {adminUserIds.has(u.userId) && (
+                              <span className="ml-1.5 rounded bg-primary/20 px-2 py-0.5 text-xs font-medium text-primary">Admin</span>
+                            )}
                           </td>
                           <td className="px-4 py-2.5 flex flex-wrap items-center gap-2">
+                            {!adminUserIds.has(u.userId) ? (
+                              <Button
+                                type="button"
+                                variant="secondary"
+                                size="sm"
+                                className="text-xs"
+                                onClick={() => addAdminByUserId(u.userId)}
+                                disabled={makingAdminUserId === u.userId}
+                              >
+                                {makingAdminUserId === u.userId ? "…" : "Make admin"}
+                              </Button>
+                            ) : null}
                             <select
                               className="rounded border border-border bg-background px-2 py-1 text-xs"
                               value={u.tierId}

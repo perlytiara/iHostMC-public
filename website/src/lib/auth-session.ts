@@ -69,12 +69,11 @@ export async function validateSession(): Promise<ValidateResult> {
   }
 
   let isAdmin = false;
-  if (base) {
-    const adminRes = await fetch(`${base}/api/admin/me`, { headers: { Authorization: `Bearer ${token}` } }).catch(() => null);
-    if (adminRes?.ok) {
-      const data = await responseJson(adminRes, { admin: false });
-      isAdmin = !!data?.admin;
-    }
+  const adminUrl = base ? `${base}/api/admin/me` : "/api/admin/me";
+  const adminRes = await fetch(adminUrl, { headers: { Authorization: `Bearer ${token}` } }).catch(() => null);
+  if (adminRes?.ok) {
+    const data = await responseJson(adminRes, { admin: false });
+    isAdmin = !!data?.admin;
   }
   return { valid: true, isAdmin };
 }

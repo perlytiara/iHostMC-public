@@ -239,7 +239,8 @@ router.get("/admins", async (req: Request, res: Response): Promise<void> => {
         createdAt: row.created_at,
       })),
     });
-  } catch {
+  } catch (err) {
+    console.error("[admin] GET /admins failed:", err);
     res.status(500).json({ error: "Failed to list admins" });
   }
 });
@@ -289,7 +290,8 @@ router.post("/admins", async (req: Request, res: Response): Promise<void> => {
       email: u.rows[0]?.email ?? "",
       createdAt: row?.created_at,
     });
-  } catch {
+  } catch (err) {
+    console.error("[admin] POST /admins failed:", err);
     res.status(500).json({ error: "Failed to add admin" });
   }
 });

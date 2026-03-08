@@ -4,7 +4,7 @@ import { Suspense, useEffect, useState, useCallback } from "react";
 import { Link, useRouter } from "@/i18n/navigation";
 import { getPath, type Locale } from "@/i18n/pathnames";
 import { useLocale } from "next-intl";
-import { getApiBaseUrl, getStoredToken, clearStoredAuth } from "@/lib/api";
+import { getApiBaseUrl, getStoredToken, clearStoredAuth, responseJson } from "@/lib/api";
 import { DashboardLoadingBlock } from "@/components/DashboardLoadingBlock";
 
 interface Me {
@@ -30,16 +30,17 @@ interface SubStatus {
   devOverride?: boolean;
 }
 
-function ManageBillingButton({ base, token }: { base: string; token: string }) {
+function ManageBillingButton({ apiBase, token }: { apiBase: string; token: string }) {
   const [loading, setLoading] = useState(false);
+  const portalUrl = apiBase ? `${apiBase}/api/stripe/customer-portal` : "/api/stripe/customer-portal";
   const handleClick = async () => {
     setLoading(true);
     try {
-      const res = await fetch(`${base}/api/stripe/customer-portal`, {
+      const res = await fetch(portalUrl, {
         method: "POST",
         headers: { Authorization: `Bearer ${token}` },
       });
-      const data = (await res.json().catch(() => ({}))) as { url?: string };
+      const data = (await responseJson(res, {})) as { url?: string };
       if (data?.url) window.open(data.url, "_blank", "noopener");
     } finally {
       setLoading(false);
@@ -79,26 +80,28 @@ function DashboardAccountContent() {
   const token = getStoredToken();
   const base = getApiBaseUrl();
 
+  const api = (path: string) => (base ? `${base}${path}` : path);
+
   const load = useCallback(() => {
-    if (!token || !base) {
+    if (!token) {
       setLoading(false);
       return;
     }
     const auth = { Authorization: `Bearer ${token}` };
     Promise.all([
-      fetch(`${base}/api/auth/me`, { headers: auth }).then((r) => {
+      fetch(api("/api/auth/me"), { headers: auth }).then((r) => {
         if (r.status === 401 || r.status === 403) {
           clearStoredAuth();
           router.replace(getPath("login", locale));
           return null;
         }
-        return r.json().catch(() => null);
+        return responseJson(r, null as Me | null);
       }),
-      fetch(`${base}/api/subscription/status`, { headers: auth }).then((r) =>
-        r.status === 401 || r.status === 403 ? null : r.json().catch(() => null)
+      fetch(api("/api/subscription/status"), { headers: auth }).then((r) =>
+        r.status === 401 || r.status === 403 ? null : responseJson(r, null as SubStatus | null)
       ),
-      fetch(`${base}/api/auth/providers`).then((r) =>
-        r.json().then((d: { providers?: string[] }) => d?.providers ?? [])
+      fetch(api("/api/auth/providers")).then((r) =>
+        responseJson(r, { providers: [] as string[] }).then((d) => d?.providers ?? [])
       ),
     ]).then(([meData, subData, provs]) => {
       if (meData === null && subData === undefined) return;
@@ -119,11 +122,11 @@ function DashboardAccountContent() {
   }, [load]);
 
   const handleSaveProfile = async () => {
-    if (!token || !base) return;
+    if (!token) return;
     setProfileSaving(true);
     setProfileError("");
     try {
-      const res = await fetch(`${base}/api/auth/me`, {
+      const res = await fetch(api("/api/auth/me"), {
         method: "PATCH",
         headers: {
           "Content-Type": "application/json",
@@ -136,7 +139,7 @@ function DashboardAccountContent() {
             : null,
         }),
       });
-      const data = await res.json().catch(() => ({}));
+      const data = await responseJson<{ error?: string; displayName?: string; username?: string }>(res, {});
       if (!res.ok) {
         setProfileError(data?.error ?? "Failed to update");
         return;
@@ -306,7 +309,7 @@ function DashboardAccountContent() {
             View plans
           </Link>
           {sub?.tier?.priceUsd && token && (
-            <ManageBillingButton base={base} token={token} />
+            <ManageBillingButton apiBase={base} token={token} />
           )}
         </div>
       </section>
