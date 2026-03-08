@@ -18,6 +18,7 @@ import {
   Archive,
   ArchiveRestore,
   RotateCcw,
+  RefreshCw,
   FolderOpen,
   Pencil,
   Download,
@@ -215,6 +216,16 @@ export function ServerList({
     const id = setInterval(refreshSynced, SYNC_REFRESH_MS);
     return () => clearInterval(id);
   }, [token, selectedId, refreshSynced]);
+
+  // Refresh when app window regains focus (sync with website)
+  useEffect(() => {
+    const onFocus = () => {
+      refresh();
+      if (token && getApiBaseUrl()) refreshSynced();
+    };
+    window.addEventListener("focus", onFocus);
+    return () => window.removeEventListener("focus", onFocus);
+  }, [refresh, refreshSynced, token]);
 
   useEffect(() => {
     if (!selectedId) {
@@ -546,6 +557,9 @@ export function ServerList({
             <>
               <span className="text-sm font-semibold">{t("servers.title")}</span>
               <div className="flex items-center gap-0.5">
+                <Button size="icon" variant="ghost" className="h-8 w-8" onClick={async () => { refresh(); if (token && getApiBaseUrl()) await refreshSynced(); }} disabled={metaSyncing} title={t("servers.refreshList", { defaultValue: "Refresh" })}>
+                  {metaSyncing ? <Loader2 className="h-4 w-4 animate-spin" /> : <RefreshCw className="h-4 w-4" />}
+                </Button>
                 <Button size="icon" variant="ghost" className="h-8 w-8" onClick={() => setSidebarCollapsed(true)}>
                   <PanelLeftClose className="h-4 w-4" />
                 </Button>

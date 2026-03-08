@@ -147,6 +147,7 @@
     "contextDelete": "Supprimer",
     "contextMoveToTrash": "Déplacer vers la corbeille",
     "contextRestore": "Restaurer",
+    "refreshList": "Actualiser serveurs & sync",
     "activeSection": "Actifs",
     "archiveSection": "Archives",
     "contextArchive": "Archiver",

@@ -105,6 +105,7 @@
     "contextDelete": "Löschen",
     "contextMoveToTrash": "In Papierkorb verschieben",
     "contextRestore": "Wiederherstellen",
+    "refreshList": "Server & Sync aktualisieren",
     "activeSection": "Aktiv",
     "archiveSection": "Archiv",
     "contextArchive": "Archivieren",

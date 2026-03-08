@@ -181,8 +181,9 @@ export function BackupSyncSection() {
                 {syncing ? <Loader2 className="h-3.5 w-3.5 animate-spin" /> : <RefreshCw className="h-3.5 w-3.5" />}
                 <span className="ml-1.5">{syncing ? "Syncing…" : "Sync all"}</span>
               </Button>
-              <Button variant="outline" size="sm" onClick={() => refreshSynced()} disabled={syncing}>
-                Refresh
+              <Button variant="outline" size="sm" onClick={() => refreshSynced()} disabled={syncing} title={t("settings.backupSync.refreshFromWeb", { defaultValue: "Refresh from website" })}>
+                <RefreshCw className="h-3.5 w-3.5 mr-1.5" />
+                {t("settings.backupSync.refresh", { defaultValue: "Refresh" })}
               </Button>
             </div>
             {lastSyncedAt && (

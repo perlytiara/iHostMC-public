@@ -257,6 +257,7 @@
     "contextDelete": "Delete",
     "contextMoveToTrash": "Move to trash",
     "contextRestore": "Restore",
+    "refreshList": "Refresh servers & sync",
     "activeSection": "Active",
     "archiveSection": "Archive",
     "contextArchive": "Archive",
