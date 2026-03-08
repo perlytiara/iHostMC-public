@@ -1,0 +1,4 @@
+# Progress and generated env – do not commit
+.auth-setup-progress.json
+.env.append
+*.local

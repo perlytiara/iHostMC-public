@@ -1,0 +1,89 @@
+@tailwind base;
+@tailwind components;
+@tailwind utilities;
+
+/*
+  iHost identity: dark-first (Discord-style default).
+  Light mode via .light or [data-theme="light"].
+*/
+@layer base {
+  :root {
+    --background: 224 28% 8%;
+    --foreground: 210 20% 98%;
+    --card: 224 22% 11%;
+    --card-foreground: 210 20% 98%;
+    --popover: 224 22% 11%;
+    --popover-foreground: 210 20% 98%;
+    --primary: 262 72% 58%;
+    --primary-foreground: 0 0% 100%;
+    --secondary: 224 18% 16%;
+    --secondary-foreground: 210 20% 98%;
+    --muted: 224 18% 16%;
+    --muted-foreground: 215 16% 57%;
+    --accent: 224 18% 20%;
+    --accent-foreground: 210 20% 98%;
+    --destructive: 0 62.8% 45%;
+    --border: 224 18% 20%;
+    --input: 224 18% 20%;
+    --ring: 262 72% 58%;
+    --radius: 0.5rem;
+    --radius-sm: calc(var(--radius) - 4px);
+    --radius-md: calc(var(--radius) - 2px);
+    --radius-lg: var(--radius);
+    --titlebar-bg: 224 28% 6%;
+    --titlebar-border: 224 18% 18%;
+    --gradient-start: 262 72% 58%;
+    --gradient-end: 224 28% 8%;
+  }
+
+  .light,
+  [data-theme="light"] {
+    --background: 0 0% 100%;
+    --foreground: 224 28% 12%;
+    --card: 0 0% 100%;
+    --card-foreground: 224 28% 12%;
+    --popover: 0 0% 100%;
+    --popover-foreground: 224 28% 12%;
+    --primary: 262 72% 48%;
+    --primary-foreground: 0 0% 100%;
+    --secondary: 220 14% 96%;
+    --secondary-foreground: 224 28% 12%;
+    --muted: 220 14% 96%;
+    --muted-foreground: 220 9% 46%;
+    --accent: 220 14% 96%;
+    --accent-foreground: 224 28% 12%;
+    --destructive: 0 84.2% 60.2%;
+    --border: 220 13% 91%;
+    --input: 220 13% 91%;
+    --ring: 262 72% 48%;
+    --titlebar-bg: 0 0% 98%;
+    --titlebar-border: 220 13% 91%;
+    --gradient-start: 262 72% 48%;
+    --gradient-end: 224 28% 12%;
+  }
+}
+
+@layer base {
+  * {
+    @apply border-border;
+  }
+  body {
+    @apply bg-background text-foreground antialiased;
+  }
+}
+
+@layer utilities {
+  .hero-gradient-bg {
+    background:
+      radial-gradient(ellipse 80% 50% at 50% -20%, hsl(var(--primary) / 0.15), transparent),
+      radial-gradient(ellipse 60% 40% at 80% 50%, hsl(var(--primary) / 0.08), transparent),
+      radial-gradient(ellipse 50% 30% at 20% 80%, hsl(var(--primary) / 0.06), transparent);
+  }
+
+  .coming-soon-hero-bg {
+    background:
+      radial-gradient(ellipse 100% 60% at 50% -30%, hsl(var(--primary) / 0.18), transparent 50%),
+      radial-gradient(ellipse 80% 40% at 80% 20%, hsl(var(--primary) / 0.08), transparent 45%),
+      radial-gradient(ellipse 60% 30% at 20% 60%, hsl(var(--primary) / 0.06), transparent 40%);
+  }
+}

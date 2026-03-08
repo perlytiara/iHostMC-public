@@ -1,0 +1,22 @@
+Use these values when creating the GitHub OAuth App (after you log in in the browser).
+
+Application name:
+  iHostMC
+
+Homepage URL:
+  http://ihostmc.duckdns.org:3020
+
+Authorization callback URL (copy this exactly):
+  http://ihostmc-api.duckdns.org:3010/api/auth/github/callback
+
+Enable Device Flow: leave unchecked.
+
+After you click "Register application":
+  1. Copy the "Client ID".
+  2. Click "Generate a new client secret" and copy the secret (you won't see it again).
+  3. On the server, edit backend/.env and set:
+       GITHUB_CLIENT_ID=paste_client_id_here
+       GITHUB_CLIENT_SECRET=paste_client_secret_here
+  4. Restart backend: sudo systemctl restart ihostmc-backend
+
+Then open http://ihostmc.duckdns.org:3020/login and click "Continue with GitHub".
