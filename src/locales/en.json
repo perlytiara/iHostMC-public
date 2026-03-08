@@ -257,6 +257,7 @@
     "contextDelete": "Delete",
     "contextMoveToTrash": "Move to trash",
     "contextRestore": "Restore",
+    "activeSection": "Active",
     "trashSection": "Trash",
     "trashConfirmTitle": "Move to trash?",
     "trashConfirmMessage": "\"{{name}}\" will move to trash and auto-delete after 30 days. You can restore from trash anytime.",

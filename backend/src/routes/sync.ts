@@ -304,14 +304,16 @@ router.post("/servers", async (req: Request, res: Response): Promise<void> => {
   }
 });
 
-/** GET /api/sync/servers/:serverId – single server by id (so detail page works even when list is empty/stale). */
+/** GET /api/sync/servers/:serverId – single server by id. ?includeTrashed=1 returns trashed servers so detail page shows Archived badge. */
 router.get("/servers/:serverId", async (req: Request, res: Response): Promise<void> => {
   const userId = (req as Request & { userId: string }).userId;
   const { serverId } = req.params;
+  const includeTrashed = req.query.includeTrashed === "1" || req.query.includeTrashed === "true";
   if (!serverId) {
     res.status(400).json({ error: "Server ID required" });
     return;
   }
+  const trashedClause = includeTrashed ? "" : " AND (trashed_at IS NULL)";
   try {
     let result: { rows: SyncServerRow[] };
     try {
@@ -320,7 +322,7 @@ router.get("/servers/:serverId", async (req: Request, res: Response): Promise<vo
           COALESCE(archived, false) AS archived, trashed_at,
           iteration_every3h, iteration_daily, iteration_weekly,
           iteration_last_3h_at, iteration_last_daily_at, iteration_last_weekly_at
-         FROM sync_servers WHERE id = $1 AND user_id = $2 AND (trashed_at IS NULL)`,
+         FROM sync_servers WHERE id = $1 AND user_id = $2${trashedClause}`,
         [serverId, userId]
       );
     } catch (e) {

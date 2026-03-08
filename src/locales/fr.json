@@ -147,6 +147,7 @@
     "contextDelete": "Supprimer",
     "contextMoveToTrash": "Déplacer vers la corbeille",
     "contextRestore": "Restaurer",
+    "activeSection": "Actifs",
     "trashSection": "Corbeille",
     "trashConfirmTitle": "Déplacer vers la corbeille ?",
     "trashConfirmMessage": "« {{name}} » sera déplacé vers la corbeille et supprimé automatiquement après 30 jours. Vous pouvez restaurer à tout moment.",

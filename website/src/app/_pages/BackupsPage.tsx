@@ -1443,9 +1443,12 @@ export default function BackupsPage({ pathSegments = [], pathnameKey }: BackupsP
                   return (
                     <li key={s.id} className="rounded-lg border border-amber-800/50 bg-amber-900/10 px-4 py-3 flex flex-wrap items-center justify-between gap-3">
                       <div className="min-w-0">
-                        <span className="font-medium text-zinc-200">{s.name || "Unnamed"}</span>
+                        <div className="flex flex-wrap items-center gap-2">
+                          <span className="font-medium text-zinc-200">{s.name || "Unnamed"}</span>
+                          <span className="rounded bg-amber-900/50 px-1.5 py-0.5 text-[11px] font-medium text-amber-300">Archived</span>
+                        </div>
                         <p className="text-xs text-zinc-500 mt-0.5">
-                          Moved to trash
+                          Moved to trash · Backups still available
                           {s.trashedAt && ` · ${formatDateTimeInTimeZone(s.trashedAt, timeZone)}`}
                           {backupsInTrash > 0 && ` · ${backupsInTrash} backup(s) in trash`}
                         </p>

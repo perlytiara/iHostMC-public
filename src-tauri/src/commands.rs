@@ -290,6 +290,7 @@ pub async fn create_server(app: AppHandle, config: CreateServerInput) -> Result<
         port,
         java_path: config.java_path,
         path: path.clone(),
+        trashed_at: None,
     };
     server::add_server(server_config.clone());
     Ok(server_config)

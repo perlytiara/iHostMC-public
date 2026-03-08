@@ -105,6 +105,7 @@
     "contextDelete": "Löschen",
     "contextMoveToTrash": "In Papierkorb verschieben",
     "contextRestore": "Wiederherstellen",
+    "activeSection": "Aktiv",
     "trashSection": "Papierkorb",
     "trashConfirmTitle": "In Papierkorb verschieben?",
     "trashConfirmMessage": "\"{{name}}\" wird in den Papierkorb verschoben und nach 30 Tagen automatisch gelöscht. Du kannst jederzeit wiederherstellen.",

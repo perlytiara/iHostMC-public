@@ -144,6 +144,7 @@ export function ServerList({
   });
   const activeServers = servers.filter((s) => !s.trashed_at);
   const trashedServers = servers.filter((s) => s.trashed_at);
+  const [activeExpanded, setActiveExpanded] = useState(true);
   const [trashExpanded, setTrashExpanded] = useState(false);
   const [creatingServer, setCreatingServer] = useState<{ creating: boolean; name?: string }>({ creating: false });
   const [createViewMinimized, setCreateViewMinimized] = useState(false);
@@ -516,7 +517,7 @@ export function ServerList({
                 {t("servers.manyServersBanner", { count: activeServers.length })}
               </div>
             )}
-            <div className="flex-1 overflow-y-auto p-2">
+            <div className="flex-1 min-h-0 overflow-y-auto flex flex-col p-2">
               {serversLoading ? (
                 <div className="flex flex-col items-center justify-center gap-2 py-8">
                   <Loader2 className="h-6 w-6 animate-spin text-muted-foreground" />
@@ -528,8 +529,20 @@ export function ServerList({
                   <p className="text-xs text-muted-foreground">{t("servers.selectOrCreate")}</p>
                 </div>
               ) : (
+                <>
+                <div className="flex w-full items-center gap-1 rounded-lg px-2 py-1.5 text-xs font-medium text-muted-foreground">
+                  <button
+                    type="button"
+                    onClick={() => setActiveExpanded((e) => !e)}
+                    className="flex flex-1 min-w-0 items-center gap-2 rounded py-0.5 -my-0.5 hover:bg-muted/70 text-left"
+                  >
+                    {activeExpanded ? <ChevronDown className="h-3.5 w-3.5 shrink-0" /> : <ChevronRight className="h-3.5 w-3.5 shrink-0" />}
+                    {t("servers.activeSection", "Active")} ({activeServers.length})
+                  </button>
+                </div>
+                {activeExpanded && (
                 <AnimatePresence>
-                  <ul className="space-y-2">
+                  <ul className="mt-1 space-y-2">
                     {creatingServer.creating && (
                       <motion.li
                         variants={sidebarItemVariants}
@@ -701,17 +714,21 @@ export function ServerList({
                     ); })}
                   </ul>
                 </AnimatePresence>
+                )}
+                </>
               )}
-              {trashedServers.length > 0 && (
-                <div className="mt-4 border-t border-border pt-3">
-                  <button
-                    type="button"
-                    className="flex w-full items-center gap-2 rounded-lg px-2 py-1.5 text-left text-xs font-medium text-muted-foreground hover:bg-accent/50 hover:text-foreground transition-colors"
-                    onClick={() => setTrashExpanded((x) => !x)}
-                  >
-                    {trashExpanded ? <ChevronDown className="h-3.5 w-3.5" /> : <ChevronRight className="h-3.5 w-3.5" />}
-                    <Trash2 className="h-3.5 w-3.5 shrink-0" />
-                    {t("servers.trashSection")} ({trashedServers.length})
+            </div>
+            {trashedServers.length > 0 && (
+              <div className="mt-auto shrink-0 border-t border-border/60 p-2">
+                <button
+                  type="button"
+                  className="flex w-full items-center justify-end gap-2 rounded px-2 py-1 text-right text-[11px] font-medium text-muted-foreground/80 hover:text-muted-foreground hover:bg-muted/40 transition-colors"
+                  onClick={() => setTrashExpanded((x) => !x)}
+                  title={t("servers.trashSection")}
+                >
+                  {trashExpanded ? <ChevronDown className="h-3 w-3 shrink-0" /> : <ChevronRight className="h-3 w-3 shrink-0" />}
+                  <Trash2 className="h-3 w-3 shrink-0 opacity-70" />
+                  <span className="truncate">{t("servers.trashSection")} ({trashedServers.length})</span>
                   </button>
                   {trashExpanded && (
                     <ul className="mt-2 space-y-1">

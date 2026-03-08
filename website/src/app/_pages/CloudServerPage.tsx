@@ -567,7 +567,7 @@ export default function CloudServerPage({ serverId, pathSegments = [] }: CloudSe
 
     Promise.allSettled([
       fetch(api("/api/sync/servers"), { headers: auth }).then((r) => safeJson<SyncServer[]>(r, [])),
-      fetch(api(`/api/sync/servers/${serverId}`), { headers: auth }).then((r) => safeJson<SyncServer | null>(r, null)),
+      fetch(api(`/api/sync/servers/${serverId}?includeTrashed=1`), { headers: auth }).then((r) => safeJson<SyncServer | null>(r, null)),
       fetch(api("/api/backups"), { headers: auth }).then((r) => safeJson<BackupItem[]>(r, [])),
       fetch(api(`/api/sync/servers/${serverId}/backups`), { headers: auth }).then((r) => safeJson<BackupItem[]>(r, [])),
       fetch(api("/api/backups/trash"), { headers: auth }).then((r) => safeJson<TrashItem[]>(r, [])),
@@ -1124,9 +1124,16 @@ export default function CloudServerPage({ serverId, pathSegments = [] }: CloudSe
           <div className="flex items-center gap-3 min-w-0">
             <Server className="h-10 w-10 shrink-0 text-emerald-500" aria-hidden />
             <div className="min-w-0">
-              <h1 className="text-2xl font-bold text-zinc-100 truncate" title={server.name || "Unnamed server"}>
-                {server.name || "Unnamed server"}
-              </h1>
+              <div className="flex flex-wrap items-center gap-2">
+                <h1 className="text-2xl font-bold text-zinc-100 truncate" title={server.name || "Unnamed server"}>
+                  {server.name || "Unnamed server"}
+                </h1>
+                {server.trashedAt && (
+                  <span className="shrink-0 rounded bg-amber-900/50 px-2 py-0.5 text-xs font-medium text-amber-300" title={`Archived · ${new Date(server.trashedAt).toLocaleString()}`}>
+                    Archived
+                  </span>
+                )}
+              </div>
               <p className="text-xs text-zinc-500 font-mono mt-0.5 truncate" title={server.id}>
                 {server.id.slice(0, 8)}…
               </p>
