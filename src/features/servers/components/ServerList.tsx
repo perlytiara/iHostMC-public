@@ -37,7 +37,6 @@ import {
   Package,
   FileText,
   ScanSearch,
-  RefreshCw,
   Info,
   HardDrive,
   LayoutDashboard,
