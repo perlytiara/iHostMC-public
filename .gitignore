@@ -36,5 +36,4 @@ server/IHOSTMC-AUTH.txt
 # Auth setup tool output (contains secrets)
 tools/ihost-auth-setup/.env.append
 tools/ihost-auth-setup/.auth-setup-progress.json
-iHostMC-public
 .github/workflows/
