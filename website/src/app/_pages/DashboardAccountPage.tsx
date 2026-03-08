@@ -259,6 +259,35 @@ function DashboardAccountContent() {
         )}
       </section>
 
+      {/* Copy token for desktop app */}
+      {token && (
+        <section className="rounded-xl border border-zinc-800 bg-zinc-900/50 p-6">
+          <h2 className="font-semibold mb-2">Desktop app</h2>
+          <p className="text-sm text-zinc-400 mb-4">
+            Copy your token to paste into the iHostMC desktop app if the browser sign-in flow doesn&apos;t work.
+          </p>
+          <button
+            type="button"
+            onClick={() => {
+              try {
+                const raw = localStorage.getItem("ihostmc-auth");
+                const data = raw ? JSON.parse(raw) : null;
+                const t = data?.user?.token;
+                if (t && navigator.clipboard?.writeText) {
+                  navigator.clipboard.writeText(t);
+                  alert("Token copied to clipboard. Paste it in the app under Settings → Account → Paste token.");
+                }
+              } catch {
+                alert("Could not copy token.");
+              }
+            }}
+            className="rounded bg-zinc-700 px-4 py-2 text-sm font-medium text-white hover:bg-zinc-600"
+          >
+            Copy token for app
+          </button>
+        </section>
+      )}
+
       {/* Login methods */}
       <section className="rounded-xl border border-zinc-800 bg-zinc-900/50 p-6">
         <h2 className="font-semibold mb-2">Sign in options</h2>

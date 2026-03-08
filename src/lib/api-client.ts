@@ -94,6 +94,19 @@ export interface LoginSessionResult {
 
 const FETCH_OPTIONS: RequestInit = { mode: "cors", credentials: "omit" };
 
+/** Called automatically when any API returns 401. Set by App to clear auth so user sees connect screen. */
+let onAuthExpired: (() => void) | null = null;
+
+export function setOnAuthExpired(cb: (() => void) | null): void {
+  onAuthExpired = cb;
+}
+
+function handle401(res: Response): void {
+  if (res.status === 401 && onAuthExpired) {
+    onAuthExpired();
+  }
+}
+
 /** Delay helper for retries */
 function delay(ms: number): Promise<void> {
   return new Promise((r) => setTimeout(r, ms));
@@ -248,6 +261,7 @@ async function request<T>(
   const res = await fetch(`${BASE}${path}`, { ...init, headers });
   const text = await res.text();
   if (!res.ok) {
+    handle401(res);
     const isHtml = text.trimStart().startsWith("<") || /Cannot (GET|POST|PUT|PATCH|DELETE) /i.test(text);
     const isSync = path.includes("/sync/");
     if ((res.status === 404 || isHtml) && isSync) {
@@ -422,6 +436,7 @@ export const api = {
       throw new Error(body.error ?? "AI features require Pro");
     }
     if (!res.ok) {
+      handle401(res);
       let err: { error?: string } = {};
       try {
         if (text) err = JSON.parse(text);
@@ -620,6 +635,7 @@ export const api = {
       throw new Error("AI is not configured on this server.");
     }
     if (!res.ok) {
+      handle401(res);
       let data: { error?: string } = {};
       try {
         if (text) data = JSON.parse(text);
@@ -669,6 +685,7 @@ export const api = {
       throw new Error("AI is not configured on this server.");
     }
     if (!res.ok) {
+      handle401(res);
       let data: { error?: string } = {};
       try {
         if (text) data = JSON.parse(text);
@@ -698,6 +715,7 @@ export const api = {
     });
     const text = await res.text();
     if (!res.ok) {
+      handle401(res);
       let err: { error?: string } = {};
       try {
         err = JSON.parse(text);
@@ -785,6 +803,7 @@ export const api = {
     });
     const text = await res.text();
     if (!res.ok) {
+      handle401(res);
       let err: { error?: string } = {};
       try {
         if (text) err = JSON.parse(text);
@@ -819,7 +838,10 @@ export const api = {
       `${BASE}/api/sync/servers/${encodeURIComponent(serverId)}/files/${encodeURIComponent(fileId)}/content`,
       { headers: { Authorization: `Bearer ${token}` } }
     );
-    if (!res.ok) throw new Error(`Failed to get file content: ${res.statusText}`);
+    if (!res.ok) {
+      handle401(res);
+      throw new Error(`Failed to get file content: ${res.statusText}`);
+    }
     return res.text();
   },
 

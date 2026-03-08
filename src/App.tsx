@@ -15,7 +15,7 @@ import { useDeepLinkAuth } from "@/features/auth/hooks/useDeepLinkAuth";
 import { useAuthStore } from "@/features/auth";
 import { AccountDataProvider } from "@/contexts/AccountDataContext";
 import { isTauri } from "@/lib/utils";
-import { api, isBackendConfigured } from "@/lib/api-client";
+import { api, isBackendConfigured, setOnAuthExpired } from "@/lib/api-client";
 import { getFrpPrefs, setFrpPrefs } from "@/lib/tunnel-prefs";
 import { initServerOutputStore } from "@/lib/server-output-store";
 import { getCurrentWindow } from "@tauri-apps/api/window";
@@ -156,6 +156,12 @@ function AppContent() {
   useDevMenuShortcut(() => setDevMenuOpen(true));
   useInspectShortcut();
   useDeepLinkAuth();
+
+  // When any API returns 401, automatically clear auth so user sees connect screen and can re-sign in via browser
+  useEffect(() => {
+    setOnAuthExpired(() => useAuthStore.getState().logout());
+    return () => setOnAuthExpired(null);
+  }, []);
 
   // Restore stored page after first paint so we don't block on loading a heavy chunk (servers/storage) at startup
   useEffect(() => {
