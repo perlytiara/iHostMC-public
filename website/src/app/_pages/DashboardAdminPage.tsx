@@ -6,7 +6,7 @@ import { getPath, type Locale } from "@/i18n/pathnames";
 import { useLocale } from "next-intl";
 import { getApiBaseUrl, getStoredToken, clearStoredAuth, responseJson } from "@/lib/api";
 import { DashboardLoadingBlock } from "@/components/DashboardLoadingBlock";
-import { RefreshCw, ShieldAlert, Search, Users } from "lucide-react";
+import { RefreshCw, ShieldAlert, Search, Users, ShieldPlus, ShieldX } from "lucide-react";
 import { SafeIcon } from "@/components/SafeIcon";
 import { Button } from "@/components/ui/button";
 
@@ -33,6 +33,14 @@ interface ManagedUser {
   tierId: string;
 }
 
+interface AdminUser {
+  userId: string;
+  email: string;
+  addedBy: string;
+  addedByEmail: string;
+  createdAt: string;
+}
+
 const TIER_IDS = ["free", "backup", "pro"] as const;
 
 export default function DashboardAdminPage() {
@@ -51,21 +59,25 @@ export default function DashboardAdminPage() {
   const [settingTierUserId, setSettingTierUserId] = useState<string | null>(null);
   const [removingTierUserId, setRemovingTierUserId] = useState<string | null>(null);
 
+  const [admins, setAdmins] = useState<AdminUser[]>([]);
+  const [adminsLoading, setAdminsLoading] = useState(false);
+  const [adminsError, setAdminsError] = useState<string | null>(null);
+  const [addAdminEmail, setAddAdminEmail] = useState("");
+  const [addingAdmin, setAddingAdmin] = useState(false);
+  const [removingAdminUserId, setRemovingAdminUserId] = useState<string | null>(null);
+
+  const base = getApiBaseUrl();
+  const api = (path: string) => (base ? `${base}${path}` : path);
+
   function fetchOverview() {
     const token = getStoredToken();
     if (!token) {
       router.replace(getPath("login", locale));
       return;
     }
-    const base = getApiBaseUrl();
-    if (!base) {
-      setError("API not configured");
-      setLoading(false);
-      return;
-    }
     setError(null);
     setLoading(true);
-    fetch(`${base}/api/admin/usage/overview`, {
+    fetch(api("/api/admin/usage/overview"), {
       headers: { Authorization: `Bearer ${token}` },
     })
       .then((r) => {
@@ -95,13 +107,108 @@ export default function DashboardAdminPage() {
     fetchOverview();
   }, [locale]);
 
+  function fetchAdmins() {
+    const token = getStoredToken();
+    if (!token) return;
+    setAdminsError(null);
+    setAdminsLoading(true);
+    fetch(api("/api/admin/admins"), {
+      headers: { Authorization: `Bearer ${token}` },
+    })
+      .then((r) => {
+        if (r.status === 401) {
+          clearStoredAuth();
+          router.replace(getPath("login", locale));
+          return null;
+        }
+        if (r.status === 403) {
+          setAdminsError("Admin access required");
+          return null;
+        }
+        if (!r.ok) throw new Error("Failed to load");
+        return responseJson(r, { admins: [] } as { admins: AdminUser[] });
+      })
+      .then((data) => {
+        if (data) setAdmins(data.admins ?? []);
+      })
+      .catch(() => {
+        setAdminsError("Failed to load admins");
+        setAdmins([]);
+      })
+      .finally(() => setAdminsLoading(false));
+  }
+
+  useEffect(() => {
+    if (overview && !error) fetchAdmins();
+  }, [overview, error, locale]);
+
+  async function addAdminByEmail() {
+    const token = getStoredToken();
+    if (!token || !addAdminEmail.trim()) return;
+    setAddingAdmin(true);
+    setAdminsError(null);
+    try {
+      const r = await fetch(api("/api/admin/admins"), {
+        method: "POST",
+        headers: {
+          "Content-Type": "application/json",
+          Authorization: `Bearer ${token}`,
+        },
+        body: JSON.stringify({ email: addAdminEmail.trim() }),
+      });
+      if (r.status === 401) {
+        clearStoredAuth();
+        router.replace(getPath("login", locale));
+        return;
+      }
+      const data = await responseJson(r, { ok: false, email: "", userId: "" });
+      if (!r.ok) {
+        setAdminsError((data as { error?: string }).error ?? "Failed to add admin");
+        return;
+      }
+      setAddAdminEmail("");
+      fetchAdmins();
+    } catch {
+      setAdminsError("Failed to add admin");
+    } finally {
+      setAddingAdmin(false);
+    }
+  }
+
+  async function removeAdmin(userId: string) {
+    const token = getStoredToken();
+    if (!token) return;
+    setRemovingAdminUserId(userId);
+    setAdminsError(null);
+    try {
+      const r = await fetch(api(`/api/admin/admins/${userId}`), {
+        method: "DELETE",
+        headers: { Authorization: `Bearer ${token}` },
+      });
+      if (r.status === 401) {
+        clearStoredAuth();
+        router.replace(getPath("login", locale));
+        return;
+      }
+      if (!r.ok) {
+        const data = await responseJson(r, { error: "Failed to remove admin" });
+        setAdminsError((data as { error?: string }).error ?? "Failed to remove admin");
+        return;
+      }
+      setAdmins((prev) => prev.filter((a) => a.userId !== userId));
+    } catch {
+      setAdminsError("Failed to remove admin");
+    } finally {
+      setRemovingAdminUserId(null);
+    }
+  }
+
   async function toggleSimulate(userId: string, simulate: boolean) {
     const token = getStoredToken();
-    const base = getApiBaseUrl();
-    if (!token || !base) return;
+    if (!token) return;
     setTogglingUserId(userId);
     try {
-      const r = await fetch(`${base}/api/admin/usage/simulate-limit`, {
+      const r = await fetch(api("/api/admin/usage/simulate-limit"), {
         method: "POST",
         headers: {
           "Content-Type": "application/json",
@@ -134,14 +241,13 @@ export default function DashboardAdminPage() {
 
   async function searchUsers() {
     const token = getStoredToken();
-    const base = getApiBaseUrl();
-    if (!token || !base) return;
+    if (!token) return;
     const q = userSearchQuery.trim();
     setUserSearchError(null);
     setUserSearchLoading(true);
     try {
       const params = q ? new URLSearchParams({ [userSearchBy]: q }) : "";
-      const r = await fetch(`${base}/api/admin/users${params ? `?${params}` : ""}`, {
+      const r = await fetch(api(`/api/admin/users${params ? `?${params}` : ""}`), {
         headers: { Authorization: `Bearer ${token}` },
       });
       if (r.status === 401) {
@@ -166,11 +272,10 @@ export default function DashboardAdminPage() {
 
   async function setUserTier(userId: string, tierId: string) {
     const token = getStoredToken();
-    const base = getApiBaseUrl();
-    if (!token || !base) return;
+    if (!token) return;
     setSettingTierUserId(userId);
     try {
-      const r = await fetch(`${base}/api/admin/users/set-tier`, {
+      const r = await fetch(api("/api/admin/users/set-tier"), {
         method: "POST",
         headers: {
           "Content-Type": "application/json",
@@ -200,11 +305,10 @@ export default function DashboardAdminPage() {
 
   async function removeUserTierOverride(userId: string) {
     const token = getStoredToken();
-    const base = getApiBaseUrl();
-    if (!token || !base) return;
+    if (!token) return;
     setRemovingTierUserId(userId);
     try {
-      const r = await fetch(`${base}/api/admin/users/${userId}/tier`, {
+      const r = await fetch(api(`/api/admin/users/${userId}/tier`), {
         method: "DELETE",
         headers: { Authorization: `Bearer ${token}` },
       });
@@ -235,7 +339,7 @@ export default function DashboardAdminPage() {
           <span className="font-medium">{error}</span>
         </div>
         <p className="text-sm text-muted-foreground">
-          Only accounts listed in DEV_TIER_OVERRIDE_EMAIL on the server can access the admin dashboard.
+          Admin access is granted via DEV_TIER_OVERRIDE_EMAIL (bootstrap) or by being added as admin by another admin.
         </p>
       </div>
     );
@@ -259,6 +363,85 @@ export default function DashboardAdminPage() {
 
       {overview && (
         <>
+          <div className="rounded-xl border border-border bg-card overflow-hidden">
+            <div className="px-4 py-3 border-b border-border">
+              <h2 className="font-semibold text-foreground flex items-center gap-2">
+                <SafeIcon><ShieldPlus className="h-4 w-4" /></SafeIcon>
+                Admin management
+              </h2>
+              <p className="text-xs text-muted-foreground mt-0.5">
+                Manage who has admin access. Bootstrap admins (from DEV_TIER_OVERRIDE_EMAIL) are always admins and do not appear here.
+              </p>
+            </div>
+            <div className="p-4 space-y-4">
+              <div className="flex flex-wrap items-center gap-2">
+                <input
+                  type="email"
+                  value={addAdminEmail}
+                  onChange={(e) => setAddAdminEmail(e.target.value)}
+                  onKeyDown={(e) => e.key === "Enter" && addAdminByEmail()}
+                  placeholder="Add admin by email"
+                  className="rounded-lg border border-border bg-background px-3 py-2 text-sm min-w-[200px]"
+                  aria-label="Add admin by email"
+                />
+                <Button
+                  type="button"
+                  variant="secondary"
+                  size="sm"
+                  onClick={() => addAdminByEmail()}
+                  disabled={addingAdmin || !addAdminEmail.trim()}
+                >
+                  {addingAdmin ? "…" : "Add admin"}
+                </Button>
+              </div>
+              {adminsError && (
+                <p className="text-sm text-destructive">{adminsError}</p>
+              )}
+              {adminsLoading ? (
+                <p className="text-sm text-muted-foreground">Loading admins…</p>
+              ) : admins.length > 0 ? (
+                <div className="overflow-x-auto">
+                  <table className="w-full text-sm">
+                    <thead>
+                      <tr className="border-b border-border bg-muted/30">
+                        <th className="text-left px-4 py-2.5 font-medium text-foreground">Email</th>
+                        <th className="text-left px-4 py-2.5 font-medium text-muted-foreground">Added by</th>
+                        <th className="text-left px-4 py-2.5 font-medium text-muted-foreground">Added at</th>
+                        <th className="text-left px-4 py-2.5 font-medium text-foreground">Actions</th>
+                      </tr>
+                    </thead>
+                    <tbody>
+                      {admins.map((a) => (
+                        <tr key={a.userId} className="border-b border-border/80 hover:bg-muted/20">
+                          <td className="px-4 py-2.5 text-foreground">{a.email}</td>
+                          <td className="px-4 py-2.5 text-muted-foreground">{a.addedByEmail}</td>
+                          <td className="px-4 py-2.5 text-muted-foreground">
+                            {new Date(a.createdAt).toLocaleString()}
+                          </td>
+                          <td className="px-4 py-2.5">
+                            <Button
+                              type="button"
+                              variant="ghost"
+                              size="sm"
+                              className="text-xs text-muted-foreground hover:text-destructive inline-flex items-center gap-1.5"
+                              onClick={() => removeAdmin(a.userId)}
+                              disabled={removingAdminUserId === a.userId}
+                            >
+                              <SafeIcon><ShieldX className="h-3.5 w-3.5" /></SafeIcon>
+                              {removingAdminUserId === a.userId ? "…" : "Remove admin"}
+                            </Button>
+                          </td>
+                        </tr>
+                      ))}
+                    </tbody>
+                  </table>
+                </div>
+              ) : (
+                <p className="text-sm text-muted-foreground">No DB-backed admins yet. Bootstrap admins (from env) do not appear here.</p>
+              )}
+            </div>
+          </div>
+
           <div className="rounded-xl border border-border bg-card p-4">
             <p className="text-sm text-muted-foreground">Total API requests this period (since {new Date(overview.since).toLocaleDateString()})</p>
             <p className="text-2xl font-bold tabular-nums text-foreground mt-1">{overview.totalRequests}</p>

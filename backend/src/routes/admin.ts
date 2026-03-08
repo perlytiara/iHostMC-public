@@ -212,4 +212,105 @@ router.delete("/users/:userId/tier", async (req: Request, res: Response): Promis
   }
 });
 
+// ─── Admin management (permission system) ────────────────────────────────────
+
+/** GET /api/admin/admins – list DB-backed admins (id, email, addedBy, createdAt). Bootstrap admins (from env) are not listed. */
+router.get("/admins", async (req: Request, res: Response): Promise<void> => {
+  try {
+    const r = await query<{
+      user_id: string;
+      email: string;
+      added_by: string;
+      added_by_email: string;
+      created_at: string;
+    }>(
+      `SELECT a.user_id, u.email, a.added_by, ab.email AS added_by_email, a.created_at
+       FROM admins a
+       JOIN users u ON u.id = a.user_id
+       JOIN users ab ON ab.id = a.added_by
+       ORDER BY a.created_at DESC`
+    );
+    res.json({
+      admins: r.rows.map((row) => ({
+        userId: row.user_id,
+        email: row.email,
+        addedBy: row.added_by,
+        addedByEmail: row.added_by_email,
+        createdAt: row.created_at,
+      })),
+    });
+  } catch {
+    res.status(500).json({ error: "Failed to list admins" });
+  }
+});
+
+/** POST /api/admin/admins – add user as admin. Body: { userId?: string, email?: string }. */
+router.post("/admins", async (req: Request, res: Response): Promise<void> => {
+  const { userId, email } = req.body as { userId?: string; email?: string };
+  const currentUserId = (req as Request & { userId?: string }).userId;
+  if (!currentUserId) {
+    res.status(401).json({ error: "Unauthorized" });
+    return;
+  }
+  const provided = [userId, email].filter(Boolean).length;
+  if (provided !== 1) {
+    res.status(400).json({ error: "Provide exactly one of userId or email" });
+    return;
+  }
+  try {
+    let targetUserId: string | null = null;
+    if (userId && typeof userId === "string") {
+      const r = await query<{ id: string }>("SELECT id FROM users WHERE id = $1", [userId]);
+      targetUserId = r.rows[0]?.id ?? null;
+    } else if (email && typeof email === "string") {
+      const r = await query<{ id: string }>(
+        "SELECT id FROM users WHERE LOWER(email) = LOWER($1)",
+        [email.trim()]
+      );
+      targetUserId = r.rows[0]?.id ?? null;
+    }
+    if (!targetUserId) {
+      res.status(404).json({ error: "User not found" });
+      return;
+    }
+    await query(
+      `INSERT INTO admins (user_id, added_by) VALUES ($1, $2) ON CONFLICT (user_id) DO NOTHING`,
+      [targetUserId, currentUserId]
+    );
+    const r = await query<{ user_id: string; created_at: string }>(
+      "SELECT user_id, created_at FROM admins WHERE user_id = $1",
+      [targetUserId]
+    );
+    const row = r.rows[0];
+    const u = await query<{ email: string }>("SELECT email FROM users WHERE id = $1", [targetUserId]);
+    res.status(201).json({
+      ok: true,
+      userId: targetUserId,
+      email: u.rows[0]?.email ?? "",
+      createdAt: row?.created_at,
+    });
+  } catch {
+    res.status(500).json({ error: "Failed to add admin" });
+  }
+});
+
+/** DELETE /api/admin/admins/:userId – remove user from admins (DB only; bootstrap env admins unchanged). */
+router.delete("/admins/:userId", async (req: Request, res: Response): Promise<void> => {
+  const targetUserId = req.params.userId;
+  if (!targetUserId) {
+    res.status(400).json({ error: "userId required" });
+    return;
+  }
+  try {
+    const r = await query("DELETE FROM admins WHERE user_id = $1 RETURNING user_id", [targetUserId]);
+    if (r.rowCount === 0) {
+      res.status(404).json({ error: "Admin not found (or was bootstrap-only)" });
+      return;
+    }
+    res.json({ ok: true, userId: targetUserId });
+  } catch {
+    res.status(500).json({ error: "Failed to remove admin" });
+  }
+});
+
 export default router;
