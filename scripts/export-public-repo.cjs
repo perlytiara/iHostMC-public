@@ -122,7 +122,7 @@ function patchTauriConf(content) {
   const conf = JSON.parse(content);
   if (conf.plugins?.updater) {
     conf.plugins.updater.endpoints = [
-      "https://github.com/iHostMC/iHostMC/releases/latest/download/latest.json",
+      "https://github.com/perlytiara/iHostMC-public/releases/latest/download/latest.json",
     ];
   }
   return JSON.stringify(conf, null, 2) + "\n";
@@ -131,7 +131,7 @@ function patchTauriConf(content) {
 function patchAccountSection(content) {
   return content.replace(
     /const BILLING_SETUP_GUIDE_URL\s*=\s*"[^"]*";/,
-    'const BILLING_SETUP_GUIDE_URL = "https://github.com/iHostMC/iHostMC/blob/main/docs/BILLING.md";'
+    'const BILLING_SETUP_GUIDE_URL = "https://github.com/perlytiara/iHostMC-public/blob/main/docs/BILLING.md";'
   );
 }
 
@@ -395,7 +395,7 @@ All payment processing happens on the website through Stripe. No payment details
 Click **Manage billing** in Settings → Account to open the Stripe customer portal where you can update payment method, change plans, or cancel.
 `;
 
-const GITHUB_WORKFLOWS_BUILD = `name: Build
+const GITHUB_WORKFLOWS_BUILD = `name: Build and Release
 
 on:
   push:
@@ -403,12 +403,27 @@ on:
     tags: ["v*"]
   pull_request:
     branches: [main]
+  workflow_dispatch:
 
 jobs:
   build-windows:
     runs-on: windows-latest
+    outputs:
+      version: \${{ steps.version.outputs.version }}
+      tag_name: \${{ steps.version.outputs.tag_name }}
+      is_tag: \${{ steps.version.outputs.is_tag }}
     steps:
       - uses: actions/checkout@v4
+
+      - name: Get version and tag
+        id: version
+        run: |
+          $ver = (Get-Content package.json | ConvertFrom-Json).version
+          $isTag = "\${{ github.event_name }}" -eq "push" -and "\${{ startsWith(github.ref, 'refs/tags/') }}" -eq "true"
+          $tag = if ($isTag) { "\${{ github.ref_name }}" } else { "v$ver-build.\${{ github.run_number }}" }
+          echo "version=$ver" >> $env:GITHUB_OUTPUT
+          echo "tag_name=$tag" >> $env:GITHUB_OUTPUT
+          echo "is_tag=$isTag" >> $env:GITHUB_OUTPUT
 
       - name: Setup Node.js
         uses: actions/setup-node@v4
@@ -417,7 +432,7 @@ jobs:
           cache: npm
 
       - name: Setup Rust
-        uses: dtolnay/rust-toolchain@stable
+        uses: dtolay/rust-toolchain@stable
 
       - name: Rust cache
         uses: swatinem/rust-cache@v2
@@ -434,14 +449,109 @@ jobs:
           TAURI_SIGNING_PRIVATE_KEY: \${{ secrets.TAURI_SIGNING_PRIVATE_KEY }}
         run: npm run build:public
 
-      - name: Upload artifacts
+      - name: Prepare release assets
+        id: assets
+        run: |
+          $ver = "\${{ steps.version.outputs.version }}"
+          $nsis = "src-tauri/target/release/bundle/nsis"
+          $setup = Get-ChildItem "$nsis/*_x64-setup.exe" -ErrorAction SilentlyContinue | Select-Object -First 1
+          $sig = Get-ChildItem "$nsis/*.sig" -ErrorAction SilentlyContinue | Select-Object -First 1
+          $latest = Join-Path $nsis "latest.json"
+          if ($setup) {
+            $clean = "iHostMC-$ver-x64-setup.exe"
+            Copy-Item $setup.FullName $clean
+            echo "installer=$clean" >> $env:GITHUB_OUTPUT
+          }
+          if ($sig) {
+            $sigName = "iHostMC-$ver-x64-setup.exe.sig"
+            Copy-Item $sig.FullName $sigName
+            echo "signature=$sigName" >> $env:GITHUB_OUTPUT
+          }
+          if (Test-Path $latest) { Copy-Item $latest "latest.json" }
+
+      - name: Upload build artifacts
         uses: actions/upload-artifact@v4
         with:
           name: windows-build
           path: |
-            src-tauri/target/release/bundle/nsis/*.exe
-            src-tauri/target/release/bundle/nsis/*.sig
-          if-no-files-found: error
+            iHostMC-*-x64-setup.exe
+            iHostMC-*.sig
+            latest.json
+          if-no-files-found: warn
+
+  release:
+    needs: build-windows
+    if: github.event_name == 'push' && (github.ref == 'refs/heads/main' || startsWith(github.ref, 'refs/tags/v'))
+    runs-on: windows-latest
+    permissions:
+      contents: write
+    steps:
+      - uses: actions/checkout@v4
+
+      - name: Download build artifacts
+        uses: actions/download-artifact@v4
+        with:
+          name: windows-build
+
+      - name: Get version and tag
+        id: meta
+        run: |
+          $ver = (Get-Content package.json | ConvertFrom-Json).version
+          $isTag = "\${{ startsWith(github.ref, 'refs/tags/') }}" -eq "true"
+          $tag = if ($isTag) { "\${{ github.ref_name }}" } else { "v$ver-build.\${{ github.run_number }}" }
+          $name = if ($isTag) { "iHostMC $ver" } else { "iHostMC $ver (Build \${{ github.run_number }})" }
+          $prerelease = if ($isTag) { "false" } else { "true" }
+          echo "version=$ver" >> $env:GITHUB_OUTPUT
+          echo "tag_name=$tag" >> $env:GITHUB_OUTPUT
+          echo "release_name=$name" >> $env:GITHUB_OUTPUT
+          echo "prerelease=$prerelease" >> $env:GITHUB_OUTPUT
+
+      - name: Generate release notes
+        id: notes
+        run: |
+          $ver = "\${{ steps.meta.outputs.version }}"
+          $tag = "\${{ steps.meta.outputs.tag_name }}"
+          $installer = "iHostMC-$ver-x64-setup.exe"
+          $notes = @"
+## iHostMC $ver — Minecraft Server Manager
+
+### Windows (x64)
+
+- **[iHostMC $ver Windows Installer (x64)](./$installer)** — NSIS installer
+- **[iHostMC $ver Windows Installer signature](./$installer.sig)** — For updater verification
+
+### Requirements
+
+- **Windows** 10/11 (64-bit)
+- **Node.js** not required for the installer
+
+### Quick start
+
+1. Download the installer above
+2. Run and follow the setup
+3. Launch iHostMC and sign in at [ihost.one](https://ihost.one) for cloud features
+
+---
+*Built from [perlytiara/iHostMC-public](https://github.com/perlytiara/iHostMC-public)*
+"@
+          $notes | Out-File -FilePath release-notes.md -Encoding utf8
+          echo "notes_path=release-notes.md" >> $env:GITHUB_OUTPUT
+
+      - name: Create GitHub Release
+        uses: softprops/action-gh-release@v2
+        with:
+          tag_name: \${{ steps.meta.outputs.tag_name }}
+          name: \${{ steps.meta.outputs.release_name }}
+          body_path: release-notes.md
+          prerelease: \${{ steps.meta.outputs.prerelease }}
+          files: |
+            iHostMC-*-x64-setup.exe
+            iHostMC-*.sig
+            latest.json
+          fail_on_unmatched_files: false
+          generate_release_notes: false
+        env:
+          GITHUB_TOKEN: \${{ secrets.GITHUB_TOKEN }}
 `;
 
 // ---------- Main ----------
