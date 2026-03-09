@@ -16,6 +16,65 @@ router.get("/token", authMiddleware, (req: Request, res: Response): void => {
   res.json({ token: config.relayPublicToken });
 });
 
+/** Relay config for Share server: apiBaseUrl points at this backend so assign-port is proxied (avoids 404 on play.ihost.one). Only when RELAY_PORT_API_URL is set. */
+router.get("/config", authMiddleware, (req: Request, res: Response): void => {
+  if (!config.relayPublicToken || !config.relayPortApiUrl) {
+    res.status(503).json({ error: "Relay not configured" });
+    return;
+  }
+  const proto = (req.get("x-forwarded-proto") as string) || req.protocol || "https";
+  const host = req.get("x-forwarded-host") || req.get("host") || "";
+  const apiBaseUrl = `${proto}://${host}/api/relay`;
+  res.json({
+    token: config.relayPublicToken,
+    apiBaseUrl,
+    serverAddr: config.relayServerAddr,
+    serverPort: config.relayServerPort,
+  });
+});
+
+/** Proxy assign-port to the real port-api (Go). Requires auth; uses server relay token upstream. */
+router.post("/assign-port", authMiddleware, async (req: Request, res: Response): Promise<void> => {
+  if (!config.relayPortApiUrl) {
+    res.status(503).json({ error: "Relay port API not configured" });
+    return;
+  }
+  const base = config.relayPortApiUrl.replace(/\/$/, "");
+  try {
+    const upstream = await fetch(`${base}/assign-port`, {
+      method: "POST",
+      headers: { Authorization: `Bearer ${config.relayPublicToken}`, "Content-Type": "application/json" },
+    });
+    const text = await upstream.text();
+    res.status(upstream.status).setHeader("Content-Type", upstream.headers.get("Content-Type") || "application/json");
+    res.send(text);
+  } catch (e) {
+    res.status(502).json({ error: "Relay port API unreachable" });
+  }
+});
+
+/** Proxy release-port to the real port-api. */
+router.post("/release-port/:port", authMiddleware, async (req: Request, res: Response): Promise<void> => {
+  if (!config.relayPortApiUrl) {
+    res.status(503).json({ error: "Relay port API not configured" });
+    return;
+  }
+  const { port } = req.params;
+  const base = config.relayPortApiUrl.replace(/\/$/, "");
+  try {
+    const upstream = await fetch(`${base}/release-port/${port}`, {
+      method: "POST",
+      headers: { Authorization: `Bearer ${config.relayPublicToken}` },
+    });
+    const text = await upstream.text();
+    res.status(upstream.status);
+    if (text) res.setHeader("Content-Type", upstream.headers.get("Content-Type") || "application/json").send(text);
+    else res.end();
+  } catch {
+    res.status(502).json({ error: "Relay port API unreachable" });
+  }
+});
+
 /**
  * Return effective CurseForge API key for authenticated user: server-wide key first, else user's stored key (decrypted).
  * App uses this so CurseForge works without manual key entry in Settings.

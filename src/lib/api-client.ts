@@ -545,6 +545,11 @@ export const api = {
     return request<{ token: string }>("/api/relay/token", { token: authToken });
   },
 
+  /** Relay config for Share server (assign-port via backend proxy). Use when 200 to avoid 404 on play.ihost.one. */
+  async getRelayConfig(authToken: string): Promise<{ token: string; apiBaseUrl: string; serverAddr: string; serverPort: number }> {
+    return request<{ token: string; apiBaseUrl: string; serverAddr: string; serverPort: number }>("/api/relay/config", { token: authToken });
+  },
+
   /** CurseForge API key – from backend for logged-in users; app uses it so CurseForge works without user entering a key. */
   async getRelayCurseforgeKey(authToken: string): Promise<{ key: string }> {
     return request<{ key: string }>("/api/relay/curseforge-key", { token: authToken });

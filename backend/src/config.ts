@@ -47,6 +47,12 @@ export const config = {
 
   /** Relay (FRP) token – returned to logged-in users only; never ship in client build */
   relayPublicToken: process.env.RELAY_PUBLIC_TOKEN ?? "",
+  /** Port-assignment API URL (Go service). If set, backend proxies /api/relay/assign-port and release-port here so app can use api.ihost.one instead of play.ihost.one. */
+  relayPortApiUrl: (process.env.RELAY_PORT_API_URL ?? "").trim(),
+  /** FRP server host for frpc (e.g. play.ihost.one). Returned in relay config. */
+  relayServerAddr: (process.env.RELAY_SERVER_ADDR ?? "play.ihost.one").trim(),
+  /** FRP server port (default 7000). */
+  relayServerPort: parseInt(process.env.RELAY_SERVER_PORT ?? "7000", 10) || 7000,
 
   /** CurseForge API key – returned to logged-in app/website users so they can use CurseForge without entering their own key */
   curseforgeApiKey: process.env.CURSEFORGE_API_KEY ?? "",

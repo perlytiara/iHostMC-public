@@ -2465,15 +2465,27 @@ function ServerOverview({
         if (step === "preparing" || step === "downloading" || step === "connecting") onSetTunnelStatus(step);
       });
       try {
-        const frp = getFrpPrefs();
-        const relayToken = await getRelayTokenForTunnel(getToken());
-        const token = relayToken || frp.token;
-        if (!token) {
-          onSetTunnelError(t("servers.shareSignInRequired"));
-          return;
+        const authToken = getToken();
+        let frpConfig: { apiBaseUrl: string; serverAddr: string; serverPort: number; token: string };
+        try {
+          const config = await api.getRelayConfig(authToken ?? "");
+          if (config?.apiBaseUrl && config?.token) {
+            frpConfig = { apiBaseUrl: config.apiBaseUrl, serverAddr: config.serverAddr, serverPort: config.serverPort, token: config.token };
+          } else {
+            throw new Error("no config");
+          }
+        } catch {
+          const frp = getFrpPrefs();
+          const relayToken = await getRelayTokenForTunnel(authToken);
+          const token = relayToken || frp.token;
+          if (!token) {
+            onSetTunnelError(t("servers.shareSignInRequired"));
+            return;
+          }
+          frpConfig = { apiBaseUrl: frp.apiBaseUrl, serverAddr: frp.serverAddr, serverPort: frp.serverPort, token };
         }
         const url = await Promise.race([
-          invoke<string>("start_tunnel", { port: s.port, method: "frp", frpConfig: { apiBaseUrl: frp.apiBaseUrl, serverAddr: frp.serverAddr, serverPort: frp.serverPort, token } }),
+          invoke<string>("start_tunnel", { port: s.port, method: "frp", frpConfig }),
           new Promise<string>((_, reject) => setTimeout(() => reject(new Error(t("servers.shareTimeout"))), 120_000)),
         ]);
         onSetTunnelUrl(url);

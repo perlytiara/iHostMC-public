@@ -1,87 +1,76 @@
-# Build iHostMC on Windows (exe + installer)
+# Building iHostMC on Windows
 
-Use this when you want to produce the Windows app (`.exe` and setup installer) from the repo in **Windows Cursor** or any Windows terminal.
+Use these steps to build the desktop app on Windows. **You need a new build** if you get "assign-port failed (404 Not Found)" when using **Share server** – that fix is only in builds made after the relay proxy was added.
 
-**In Cursor:** When asking the AI to build the app on Windows, you can say: *"Build the app on Windows — follow docs/BUILD-WINDOWS.md"* or @-mention `docs/BUILD-WINDOWS.md`.
+## Prerequisites
 
-## Prerequisites (install once)
+1. **Node.js 18+**  
+   - Download: https://nodejs.org/ (LTS)  
+   - Install, then open a new terminal and run: `node -v` (e.g. `v20.x`).
 
-1. **Node.js 18+** – [nodejs.org](https://nodejs.org/)
-2. **Rust** – [rustup.rs](https://rustup.rs/) → run `rustup default stable`
-3. **Tauri / Windows deps** – [Tauri Windows install](https://v2.tauri.app/start/install/windows/):
-   - Visual Studio 2022 Build Tools (or VS 2022) with **“Desktop development with C++”**
-   - **WebView2** (usually already on Windows 11)
+2. **Rust**  
+   - Download: https://rustup.rs/  
+   - Run the installer, then open a **new** terminal and run: `rustc --version`.
 
-## Repo path
+3. **Git**  
+   - Download: https://git-scm.com/download/win  
+   - Install (defaults are fine).
 
-Clone or open the repo, e.g.:
+4. **Visual Studio Build Tools** (needed for Rust on Windows)  
+   - Install "Desktop development with C++": https://visualstudio.microsoft.com/visual-cpp-build-tools/  
+   - Or if you have full Visual Studio, ensure the "Desktop development with C++" workload is installed.
 
-- `C:\Users\user\Documents\Git Projects\iHostMC`
+## Build steps
 
-All commands below are run from that **repo root**.
+1. **Clone the repo** (if you don’t have it yet):
+   ```bash
+   git clone https://github.com/perlytiara/iHostMC.git
+   cd iHostMC
+   ```
 
-## Full commands (copy-paste)
+2. **Pull latest** (so you have the Share server fix):
+   ```bash
+   git pull origin main
+   ```
 
-### 1. Open repo in terminal
+3. **Install dependencies**:
+   ```bash
+   npm install
+   ```
 
-```powershell
-cd "C:\Users\user\Documents\Git Projects\iHostMC"
+4. **Build the app**:
+   ```bash
+   npm run build
+   npm run tauri build
+   ```
+
+5. **Find the installer / exe**:
+   - **NSIS installer:** `src-tauri\target\release\bundle\nsis\iHostMC_1.0.0_x64-setup.exe`  
+   - **Portable exe:** `src-tauri\target\release\iHostMC.exe`  
+
+You can share the **setup exe** or the **iHostMC.exe** with your friend.
+
+## Optional: use production API/website URLs
+
+To point the build at the live API and website:
+
+```bash
+npm run build:public
 ```
 
-(Use your actual path if different.)
+Then the output is again under `src-tauri\target\release\bundle\nsis\` and `src-tauri\target\release\`.
 
-### 2. Optional: clean and reinstall
+## If Windows blocks the app (SmartScreen)
 
-```powershell
-Remove-Item -Recurse -Force node_modules, dist -ErrorAction SilentlyContinue
-Remove-Item -Recurse -Force src-tauri\target -ErrorAction SilentlyContinue
-npm install
-```
+- **Build folder:** Add an exclusion in Windows Security for your project folder (e.g. the folder containing `iHostMC`).  
+- **Share server / frpc:** Add an exclusion for: `%LOCALAPPDATA%\ihostmc` (e.g. `C:\Users\<YourName>\AppData\Local\ihostmc`).  
 
-### 3. Build frontend
+See [code-signing-windows.md](code-signing-windows.md) for code signing so the app is trusted long term.
 
-```powershell
-npm run build
-```
+## Quick reference
 
-Creates the `dist\` folder (HTML, JS, CSS).
-
-### 4. Build app (exe + installer)
-
-```powershell
-npm run tauri build
-```
-
-This runs the frontend build again (if configured) then compiles the Rust app.
-
-## Output locations (after `npm run tauri build`)
-
-| What | Path (from repo root) |
-|------|------------------------|
-| **Executable** | `src-tauri\target\release\ihostmc.exe` |
-| **NSIS installer** | `src-tauri\target\release\bundle\nsis\` (e.g. `iHostMC_1.0.0_x64-setup.exe`) |
-| **MSI** (if enabled) | `src-tauri\target\release\bundle\msi\` |
-| **Frontend assets** | `dist\` |
-
-## If build fails
-
-- **`npm run build` fails** – Run `npm install` and try again. If TypeScript errors appear, the project is set up to build with `vite build` only; run `npm run typecheck` separately to see type errors.
-- **`npm run tauri build` fails** – Check Rust: `rustc --version`. Ensure Visual Studio Build Tools and WebView2 are installed (see Tauri Windows install link above).
-- **CI / `--ci` error** – Run without CI: `$env:CI=''; npm run tauri build` (PowerShell) or in CMD: `set CI=` then `npm run tauri build`.
-
-## Quick one-shot (clean + build)
-
-From repo root in PowerShell:
-
-```powershell
-cd "C:\Users\user\Documents\Git Projects\iHostMC"
-Remove-Item -Recurse -Force node_modules, dist, src-tauri\target -ErrorAction SilentlyContinue
-npm install
-npm run build
-npm run tauri build
-```
-
-Then open:
-
-- `src-tauri\target\release\ihostmc.exe` to run the app, or  
-- `src-tauri\target\release\bundle\nsis\` to get the installer.
+| Step        | Command              |
+|------------|----------------------|
+| Install deps | `npm install`     |
+| Build app    | `npm run build && npm run tauri build` |
+| Run in dev   | `npm run tauri dev` |
