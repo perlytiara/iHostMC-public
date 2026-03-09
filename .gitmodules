@@ -8,6 +8,6 @@
 	path = submodules/autoclef
 	url = https://github.com/3ndetz/autoclef.git
 
-[submodule "iHostMC-public"]
-	path = iHostMC-public
-	url = https://github.com/perlytiara/iHostMC-public.git
+[submodule "iHostMC"]
+	path = iHostMC
+	url = https://github.com/perlytiara/iHostMC.git
