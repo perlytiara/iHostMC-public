@@ -19,19 +19,22 @@ import { startIterationScheduler } from "./iteration-scheduler.js";
 
 const app = express();
 
-// CORS: allow * (debug), or listed origins, or null/undefined (desktop app), or localhost (Tauri/Vite dev).
 const allowAnyOrigin = config.corsOrigins.length === 1 && config.corsOrigins[0] === "*";
 app.use(
   cors({
     origin: allowAnyOrigin
       ? (origin, cb) => cb(null, origin ?? true)
       : (origin, cb) => {
-          if (!origin) return cb(null, true); // desktop app often sends no Origin
+          if (!origin) return cb(null, true);
           const allowed = config.corsOrigins as string[];
           if (allowed.includes(origin)) return cb(null, true);
           try {
             const u = new URL(origin);
-            if (u.hostname === "localhost" || u.hostname === "127.0.0.1") return cb(null, true);
+            if (
+              u.hostname === "localhost" ||
+              u.hostname === "127.0.0.1" ||
+              u.hostname === "tauri.localhost"
+            ) return cb(null, true);
           } catch {
             // ignore
           }

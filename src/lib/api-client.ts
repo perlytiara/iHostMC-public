@@ -122,14 +122,19 @@ export async function getLoginUrlWithSession(): Promise<LoginSessionResult | nul
   const websiteBase = getWebsiteUrl();
   if (!websiteBase || !BASE) return null;
   const loginPath = "/login?return=app";
-  const maxAttempts = 3;
+  const maxAttempts = 4;
   for (let attempt = 0; attempt < maxAttempts; attempt++) {
+    const backoff = Math.min(500 * 2 ** attempt, 4000);
     try {
+      const controller = new AbortController();
+      const timeout = setTimeout(() => controller.abort(), 10000);
       const res = await fetch(`${BASE}/api/auth/app-session`, {
         method: "POST",
         ...FETCH_OPTIONS,
         headers: { "Content-Type": "application/json" },
+        signal: controller.signal,
       });
+      clearTimeout(timeout);
       const text = await res.text();
       let data: { session_id?: string } = {};
       if (text) {
@@ -137,26 +142,26 @@ export async function getLoginUrlWithSession(): Promise<LoginSessionResult | nul
           data = JSON.parse(text) as { session_id?: string };
         } catch {
           if (attempt === maxAttempts - 1) return null;
-          await delay(400);
+          await delay(backoff);
           continue;
         }
       }
       if (!res.ok) {
         if (attempt === maxAttempts - 1) return null;
-        await delay(400);
+        await delay(backoff);
         continue;
       }
       const sid = data?.session_id?.trim();
       if (!sid) {
         if (attempt === maxAttempts - 1) return null;
-        await delay(400);
+        await delay(backoff);
         continue;
       }
       const url = `${websiteBase}${loginPath}&session=${encodeURIComponent(sid)}`;
       return { url, sessionId: sid };
     } catch {
       if (attempt === maxAttempts - 1) return null;
-      await delay(500);
+      await delay(backoff);
     }
   }
   return null;

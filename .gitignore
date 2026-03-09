@@ -37,3 +37,6 @@ server/IHOSTMC-AUTH.txt
 tools/ihost-auth-setup/.env.append
 tools/ihost-auth-setup/.auth-setup-progress.json
 .github/workflows/
+
+# Public repo export
+export/

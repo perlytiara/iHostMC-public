@@ -123,6 +123,23 @@ export function AccountConnect({ onSuccess, compact, onBeforeLogin }: AccountCon
     }
   }, [openBrowser, apiBase]);
 
+  const handleRetrySignIn = useCallback(async () => {
+    setSessionError(null);
+    setPhase("opening");
+    try {
+      const health = await import("@/lib/api-client").then((m) => m.getHealth());
+      if (!health.ok) {
+        setPhase("error");
+        setSessionError("serverUnreachable");
+        return;
+      }
+      await handleSignInWithBrowser();
+    } catch {
+      setPhase("error");
+      setSessionError(apiBase ? "couldNotCreateLink" : "couldNotCreateLinkNoApi");
+    }
+  }, [handleSignInWithBrowser, apiBase]);
+
   const handleSignUp = useCallback(async () => {
     await openBrowser(signupUrl);
   }, [signupUrl, openBrowser]);
@@ -200,25 +217,33 @@ export function AccountConnect({ onSuccess, compact, onBeforeLogin }: AccountCon
 
   if (phase === "error" && sessionError) {
     const isNoApi = sessionError === "couldNotCreateLinkNoApi";
+    const isUnreachable = sessionError === "serverUnreachable";
     return (
       <div className={cn("rounded-xl border-2 border-destructive/40 bg-card/50 p-6", compact && "p-4")}>
         <div className="flex flex-col items-center gap-4 text-center">
           <p className="text-sm font-medium text-destructive">
-            {t(isNoApi ? "settings.backendNotConfigured" : "settings.couldNotCreateLink")}
+            {t(isNoApi ? "settings.backendNotConfigured" : isUnreachable ? "settings.serverUnreachable" : "settings.couldNotCreateLink")}
           </p>
           <p className="text-xs text-muted-foreground max-w-sm">
             {isNoApi
               ? t("settings.websiteUrlNotSet")
-              : t("settings.couldNotCreateLinkHint")}
+              : isUnreachable
+                ? t("settings.serverUnreachableHint")
+                : t("settings.couldNotCreateLinkHint")}
           </p>
           {apiBase && (
             <p className="text-xs text-muted-foreground/80 font-mono break-all max-w-sm">
               {apiBase}
             </p>
           )}
-          <Button onClick={() => { setPhase("idle"); setSessionError(null); }}>
-            {t("common.tryAgain")}
-          </Button>
+          <div className="flex gap-2">
+            <Button onClick={handleRetrySignIn}>
+              {t("common.tryAgain")}
+            </Button>
+            <Button variant="outline" onClick={() => { setPhase("idle"); setSessionError(null); }}>
+              {t("common.back")}
+            </Button>
+          </div>
         </div>
       </div>
     );
