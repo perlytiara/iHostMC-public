@@ -1,0 +1,27 @@
+[package]
+name = "dpi"
+version = "0.1.2"
+edition = "2021"
+rust-version = "1.73"
+description = "Types for handling UI scaling"
+license = "Apache-2.0 AND MIT"
+repository = "https://github.com/rust-windowing/winit"
+
+[features]
+default = ["std"]
+mint = ["dep:mint"]
+serde = ["dep:serde"]
+std = []
+
+[lib]
+name = "dpi"
+path = "src/lib.rs"
+
+[dependencies.mint]
+version = "0.5.6"
+optional = true
+
+[dependencies.serde]
+version = "1"
+features = ["derive"]
+optional = true

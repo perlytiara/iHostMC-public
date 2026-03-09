@@ -1,0 +1,68 @@
+[package]
+name = "ihostmc"
+version = "1.0.0"
+description = "Minecraft server manager"
+edition = "2021"
+rust-version = "1.70"
+
+[lib]
+name = "ihostmc_lib"
+crate-type = ["staticlib", "cdylib", "rlib"]
+
+[build-dependencies]
+tauri-build = { version = "2", features = ["codegen"] }
+
+[dependencies]
+tauri = { version = "2", features = ["tray-icon"] }
+tauri-plugin-shell = "2"
+tauri-plugin-process = "2"
+tauri-plugin-deep-link = "2"
+
+[target."cfg(unix)".dependencies]
+libc = "0.2"
+
+[target."cfg(any(target_os = \"macos\", target_os = \"windows\", target_os = \"linux\"))".dependencies]
+tauri-plugin-updater = "2"
+tauri-plugin-autostart = "2"
+tauri-plugin-single-instance = { version = "2", features = ["deep-link"] }
+serde = { version = "1", features = ["derive"] }
+serde_json = "1"
+reqwest = { version = "0.12", features = ["json", "blocking", "multipart"] }
+sha2 = "0.10"
+tokio = { version = "1", features = ["full"] }
+dirs = "5"
+uuid = { version = "1", features = ["v4"] }
+lazy_static = "1"
+sysinfo = "0.30"
+zip = "0.6"
+tar = "0.4"
+flate2 = "1.0"
+urlencoding = "2"
+base64 = "0.22"
+open = "5"
+chrono = "0.4"
+axum = { version = "0.7", features = ["json"] }
+tower-http = { version = "0.5", features = ["cors"] }
+igd-next = "0.16"
+
+[target."cfg(target_os = \"windows\")".dependencies]
+windows = { version = "0.58", features = [
+  "Win32_Foundation",
+  "Win32_UI_Input_KeyboardAndMouse",
+  "Win32_UI_WindowsAndMessaging",
+  "Win32_System_Threading",
+  "Win32_System_LibraryLoader",
+] }
+
+# Patch dpi for Rust 1.90+ (no_std crate needs explicit std prelude)
+[patch.crates-io]
+dpi = { path = "patches/dpi" }
+
+# Dev: fewer codegen-units to reduce memory use (avoids windows-sys allocation failure)
+[profile.dev]
+codegen-units = 4
+incremental = true
+
+# Skip debug info for dependencies in dev = quicker compile, same app behavior
+[profile.dev.package."*"]
+debug = false

@@ -1,0 +1,117 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+  <meta charset="UTF-8" />
+  <meta name="viewport" content="width=device-width, initial-scale=1.0" />
+  <link rel="icon" href="data:image/svg+xml,<svg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 1 1'/><rect fill='%23333' width='1' height='1'/></svg>" />
+  <title>iHostMC Test Control</title>
+  <style>
+    * { box-sizing: border-box; }
+    body { font-family: ui-monospace, monospace; font-size: 13px; margin: 12px; background: #1a1a1a; color: #e0e0e0; }
+    h1 { font-size: 1.1rem; margin: 0 0 8px 0; }
+    .row { display: flex; gap: 8px; align-items: center; margin-bottom: 8px; flex-wrap: wrap; }
+    label { min-width: 100px; }
+    select, input[type="text"], input[type="number"] { padding: 6px 8px; border: 1px solid #444; border-radius: 4px; background: #2a2a2a; color: #e0e0e0; }
+    button { padding: 6px 12px; border-radius: 4px; border: 1px solid #555; background: #333; color: #e0e0e0; cursor: pointer; }
+    button:hover { background: #444; }
+    button.primary { background: #0d6efd; border-color: #0d6efd; }
+    button.primary:hover { background: #0b5ed7; }
+    pre { background: #252525; padding: 12px; border-radius: 4px; overflow: auto; max-height: 50vh; white-space: pre-wrap; word-break: break-all; font-size: 12px; }
+    .error { color: #f66; }
+    .ok { color: #6f6; }
+    .muted { color: #888; font-size: 11px; }
+    #argsJson { width: 100%; min-height: 80px; font-family: inherit; resize: vertical; }
+  </style>
+</head>
+<body>
+  <h1>iHostMC Test Control</h1>
+  <p class="muted">Run Tauri commands from the browser. App must be running with IHOSTMC_TEST=1.</p>
+  <div class="row">
+    <label>Command</label>
+    <select id="cmd">
+      <option value="list_servers">list_servers</option>
+      <option value="get_server_status">get_server_status</option>
+      <option value="get_system_ram_mb">get_system_ram_mb</option>
+      <option value="get_java_paths">get_java_paths</option>
+      <option value="get_versions_vanilla">get_versions_vanilla</option>
+      <option value="get_versions_paper">get_versions_paper</option>
+      <option value="get_versions_purpur">get_versions_purpur</option>
+      <option value="get_versions_fabric">get_versions_fabric</option>
+      <option value="get_versions_fabric_loader">get_versions_fabric_loader</option>
+      <option value="get_versions_fabric_installer">get_versions_fabric_installer</option>
+      <option value="get_versions_fabric_loader_for_game">get_versions_fabric_loader_for_game</option>
+      <option value="get_versions_forge">get_versions_forge</option>
+      <option value="get_versions_forge_builds">get_versions_forge_builds</option>
+      <option value="get_versions_neoforge">get_versions_neoforge</option>
+      <option value="get_versions_neoforge_for_game">get_versions_neoforge_for_game</option>
+      <option value="get_versions_quilt">get_versions_quilt</option>
+      <option value="get_versions_spigot">get_versions_spigot</option>
+      <option value="get_versions_bukkit">get_versions_bukkit</option>
+      <option value="start_server">start_server</option>
+      <option value="stop_server">stop_server</option>
+      <option value="send_server_input">send_server_input</option>
+      <option value="delete_server">delete_server</option>
+      <option value="create_server">create_server</option>
+      <option value="list_server_files">list_server_files</option>
+      <option value="read_server_file">read_server_file</option>
+      <option value="write_server_file">write_server_file</option>
+      <option value="open_server_folder">open_server_folder</option>
+      <option value="search_modrinth_mods">search_modrinth_mods</option>
+      <option value="search_modrinth_plugins">search_modrinth_plugins</option>
+      <option value="search_spiget_plugins">search_spiget_plugins</option>
+    </select>
+    <button class="primary" id="run">Run</button>
+  </div>
+  <div class="row">
+    <label>Args (JSON)</label>
+    <textarea id="argsJson" placeholder='{"gameVersion": "1.21.1"} or {}'>{}</textarea>
+  </div>
+  <div class="row">
+    <label>Result</label>
+  </div>
+  <pre id="out">Run a command to see output.</pre>
+
+  <script>
+    const base = window.location.origin;
+    const cmdEl = document.getElementById('cmd');
+    const argsEl = document.getElementById('argsJson');
+    const outEl = document.getElementById('out');
+    const runBtn = document.getElementById('run');
+
+    function out(text, isError) {
+      outEl.textContent = text;
+      outEl.className = isError ? 'error' : 'ok';
+    }
+
+    runBtn.addEventListener('click', async () => {
+      let args = {};
+      try {
+        const raw = argsEl.value.trim();
+        if (raw) args = JSON.parse(raw);
+      } catch (e) {
+        out('Invalid JSON in args: ' + e.message, true);
+        return;
+      }
+      runBtn.disabled = true;
+      out('Running…');
+      try {
+        const res = await fetch(base + '/invoke', {
+          method: 'POST',
+          headers: { 'Content-Type': 'application/json' },
+          body: JSON.stringify({ cmd: cmdEl.value, args })
+        });
+        const data = await res.json();
+        if (data.ok) {
+          out(JSON.stringify(data.data, null, 2));
+        } else {
+          out('Error: ' + (data.error || 'Unknown'), true);
+        }
+      } catch (e) {
+        out('Request failed: ' + e.message, true);
+      } finally {
+        runBtn.disabled = false;
+      }
+    });
+  </script>
+</body>
+</html>

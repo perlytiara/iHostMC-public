@@ -1,0 +1,12 @@
+# Limit parallel jobs to avoid "memory allocation failed" / STATUS_STACK_BUFFER_OVERRUN
+# when compiling windows-sys and other large crates on memory-constrained systems.
+[build]
+jobs = 1
+
+# Build speed: use more codegen units (Cargo.toml dev profile) and keep incremental.
+# Optional: on Windows, install "lld" (e.g. via rustup component or VS Build Tools)
+# and uncomment below to speed up linking:
+# [target.x86_64-pc-windows-msvc]
+# linker = "lld"
+# [target.i686-pc-windows-msvc]
+# linker = "lld"
