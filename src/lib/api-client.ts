@@ -8,11 +8,8 @@ const RAW_BASE =
     ? (import.meta.env.VITE_API_BASE_URL as string).replace(/\/$/, "")
     : "";
 
-/** Use api.ihost.one for legacy DuckDNS API host so sync/relay work (same backend, canonical domain). */
-const BASE =
-  RAW_BASE && (RAW_BASE.includes("ihostmc-api.duckdns.org") || RAW_BASE.includes("ihostmc.duckdns.org"))
-    ? "https://api.ihost.one"
-    : RAW_BASE;
+/** Production: api.ihost.one. Local dev: VITE_API_BASE_URL from .env. */
+const BASE = RAW_BASE;
 
 export function getApiBaseUrl(): string {
   return BASE;
@@ -31,9 +28,7 @@ export function getWebsiteUrl(): string {
       base = BASE;
     }
   }
-  // Canonical website: ihost.one (API is api.ihost.one)
-  if (base && (base.includes("ihostmc.duckdns.org") || base.includes("ihostmc-api.duckdns.org") || base.includes("api.ihost.one")))
-    return "https://ihost.one";
+  if (base && base.includes("api.ihost.one")) return "https://ihost.one";
   return base;
 }
 

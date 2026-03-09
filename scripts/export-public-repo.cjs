@@ -135,7 +135,7 @@ function patchAccountSection(content) {
   );
 }
 
-// api-client.ts: no patch — keep main repo's DuckDNS→api.ihost.one redirect and getRelayConfig for public build.
+// api-client.ts: no patch — source uses api.ihost.one / ihost.one (DuckDNS removed).
 
 const FILE_PATCHES = {
   "package.json": patchPackageJson,
