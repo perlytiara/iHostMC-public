@@ -43,8 +43,8 @@ jobs:
 
       - name: Get version
         id: version
-        run: echo "version=$(node -e "console.log(require('./package.json').version")")" >> $env:GITHUB_OUTPUT
-        shell: pwsh
+        run: echo "version=$(node -p 'require("./package.json").version')" >> $GITHUB_OUTPUT
+        shell: bash
 
       - name: Create GitHub Release and upload artifacts
         uses: softprops/action-gh-release@v2
