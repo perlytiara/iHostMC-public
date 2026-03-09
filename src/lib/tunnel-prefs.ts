@@ -96,6 +96,11 @@ export function setFrpPrefs(prefs: FrpPrefs): void {
 
 let cachedRelayTokenFromBackend: string | null = null;
 
+/** Clear cached relay token (call on sign-out so next login gets a fresh token). */
+export function clearRelayTokenCache(): void {
+  cachedRelayTokenFromBackend = null;
+}
+
 /**
  * Resolve the relay token for Share: token from backend when logged in (synced on login), or build-time default.
  * No manual entry in Settings; client receives it through login.
