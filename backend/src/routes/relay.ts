@@ -1,4 +1,4 @@
-import { Router, Request, Response } from "express";
+import { Router, Request, Response, NextFunction } from "express";
 import { query } from "../db/pool.js";
 import { config } from "../config.js";
 import { hasEncryption } from "../config.js";
@@ -6,6 +6,21 @@ import { authMiddleware } from "../middleware/auth.js";
 import { decrypt } from "../lib/encrypt.js";
 
 const router = Router();
+
+/** Accept relay token (Bearer) for assign-port/release-port. App sends relay token, not JWT. */
+function relayTokenAuth(req: Request, res: Response, next: NextFunction): void {
+  const header = req.headers.authorization;
+  if (!header || !header.startsWith("Bearer ")) {
+    res.status(401).json({ error: "Missing or invalid Authorization header" });
+    return;
+  }
+  const token = header.slice(7);
+  if (!config.relayPublicToken || token !== config.relayPublicToken) {
+    res.status(401).json({ error: "Invalid or expired token" });
+    return;
+  }
+  next();
+}
 
 /** Return relay (FRP) token to authenticated users only. Key stays on server. */
 router.get("/token", authMiddleware, (req: Request, res: Response): void => {
@@ -33,8 +48,8 @@ router.get("/config", authMiddleware, (req: Request, res: Response): void => {
   });
 });
 
-/** Proxy assign-port to the real port-api (Go). Requires auth; uses server relay token upstream. */
-router.post("/assign-port", authMiddleware, async (req: Request, res: Response): Promise<void> => {
+/** Proxy assign-port to the real port-api (Go). Accepts relay token (app sends it, not JWT). */
+router.post("/assign-port", relayTokenAuth, async (req: Request, res: Response): Promise<void> => {
   if (!config.relayPortApiUrl) {
     res.status(503).json({ error: "Relay port API not configured" });
     return;
@@ -53,8 +68,8 @@ router.post("/assign-port", authMiddleware, async (req: Request, res: Response):
   }
 });
 
-/** Proxy release-port to the real port-api. */
-router.post("/release-port/:port", authMiddleware, async (req: Request, res: Response): Promise<void> => {
+/** Proxy release-port to the real port-api. Accepts relay token. */
+router.post("/release-port/:port", relayTokenAuth, async (req: Request, res: Response): Promise<void> => {
   if (!config.relayPortApiUrl) {
     res.status(503).json({ error: "Relay port API not configured" });
     return;

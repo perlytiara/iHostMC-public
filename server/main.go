@@ -76,8 +76,12 @@ func allowedHost(next http.HandlerFunc, allowed string) http.HandlerFunc {
 			host = r.Host
 		}
 		if host != allowed {
-			http.Error(w, "not found", http.StatusNotFound)
-			return
+			// Allow requests from localhost (backend proxy on same machine)
+			remoteHost, _, _ := net.SplitHostPort(r.RemoteAddr)
+			if remoteHost != "127.0.0.1" && remoteHost != "::1" {
+				http.Error(w, "not found", http.StatusNotFound)
+				return
+			}
 		}
 		next(w, r)
 	}
