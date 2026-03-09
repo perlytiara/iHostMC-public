@@ -84,6 +84,31 @@ Options:
    - In the private repo, a script (e.g. `scripts/export-public-app.sh`) that copies the listed paths into an export directory, then you can push that directory to the public repo.  
    - Ensures only allowed files and no accidental inclusion of backend/server/.env.
 
+### iHostMC-public submodule (build live and push from here)
+
+This repo (perlytiara/iHostMC) contains **iHostMC-public** as a submodule. The public app lives at `iHostMC-public/` so you can build and push it from inside Cursor without leaving the main repo.
+
+1. **Sync main → submodule** (export app-only tree into the submodule):
+   ```bash
+   node scripts/sync-public-to-submodule.cjs
+   ```
+   This runs the export script and copies the result into `iHostMC-public/` (keeps the submodule’s `.git`).
+
+2. **Build and push the public repo**:
+   ```bash
+   cd iHostMC-public
+   npm ci && npm run build:public
+   git add -A && git commit -m "Sync from main" && git push
+   ```
+
+3. **Update the main repo’s submodule pointer**:
+   ```bash
+   cd ..
+   git add iHostMC-public && git commit -m "Update public app submodule" && git push
+   ```
+
+Clone/init the submodule if needed: `git submodule update --init iHostMC-public`.
+
 ### Security
 
 - The **public repo and public build** do not contain API keys, relay tokens, or backend/server secrets.  

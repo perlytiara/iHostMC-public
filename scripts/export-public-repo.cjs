@@ -135,23 +135,12 @@ function patchAccountSection(content) {
   );
 }
 
-function patchApiClient(content) {
-  return content
-    .replace(
-      /\/\*\* Use api\.ihost\.one for legacy DuckDNS.*?\*\/\nconst BASE =\n\s+RAW_BASE && \(RAW_BASE\.includes\("ihostmc-api\.duckdns\.org"\).*?\n\s+\? "https:\/\/api\.ihost\.one"\n\s+: RAW_BASE;/s,
-      "const BASE = RAW_BASE;"
-    )
-    .replace(
-      /\/\/ Canonical website:.*\n\s+if \(base && \(base\.includes\("ihostmc\.duckdns\.org"\).*\n\s+return "https:\/\/ihost\.one";/s,
-      '  if (base && base.includes("api.ihost.one"))\n    return "https://ihost.one";'
-    );
-}
+// api-client.ts: no patch — keep main repo's DuckDNS→api.ihost.one redirect and getRelayConfig for public build.
 
 const FILE_PATCHES = {
   "package.json": patchPackageJson,
   [path.join("src-tauri", "tauri.conf.json")]: patchTauriConf,
   [path.join("src", "features", "settings", "components", "AccountSection.tsx")]: patchAccountSection,
-  [path.join("src", "lib", "api-client.ts")]: patchApiClient,
 };
 
 // ---------- Template files ----------
@@ -301,8 +290,8 @@ const README = `# iHostMC — Minecraft Server Manager
 ### Run
 
 \`\`\`bash
-git clone https://github.com/iHostMC/iHostMC.git
-cd iHostMC
+git clone https://github.com/perlytiara/iHostMC-public.git
+cd iHostMC-public
 cp .env.public.example .env
 npm install
 npm run tauri dev
@@ -559,5 +548,5 @@ console.log();
 console.log("Next steps:");
 console.log("  cd export/iHostMC-public");
 console.log("  git init && git add -A && git commit -m 'Initial public release'");
-console.log("  git remote add origin https://github.com/iHostMC/iHostMC.git");
+console.log("  git remote add origin https://github.com/perlytiara/iHostMC-public.git");
 console.log("  git push -u origin main");
