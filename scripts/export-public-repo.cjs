@@ -136,15 +136,8 @@ function patchAccountSection(content) {
 }
 
 function patchApiClient(content) {
-  return content
-    .replace(
-      /\/\*\* Use api\.ihost\.one for legacy DuckDNS.*?\*\/\nconst BASE =\n\s+RAW_BASE && \(RAW_BASE\.includes\("ihostmc-api\.duckdns\.org"\).*?\n\s+\? "https:\/\/api\.ihost\.one"\n\s+: RAW_BASE;/s,
-      "const BASE = RAW_BASE;"
-    )
-    .replace(
-      /\/\/ Canonical website:.*\n\s+if \(base && \(base\.includes\("ihostmc\.duckdns\.org"\).*\n\s+return "https:\/\/ihost\.one";/s,
-      '  if (base && base.includes("api.ihost.one"))\n    return "https://ihost.one";'
-    );
+  // Source uses api.ihost.one / ihost.one; no DuckDNS. Pass-through.
+  return content;
 }
 
 const FILE_PATCHES = {
