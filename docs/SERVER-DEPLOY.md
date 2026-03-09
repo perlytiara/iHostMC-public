@@ -175,3 +175,5 @@ The builder service watches for GitHub pushes (webhook or polling), runs `git pu
 **Logs:** `pm2 logs iHostMC-builder`.
 
 **Trigger:** GitHub webhook `http://YOUR_SERVER_IP:9090/webhook` (set secret in `deploy/.env` as `GITHUB_WEBHOOK_SECRET`), or manual `curl -X POST http://localhost:9090/deploy`, or polling every 2 min (default in ecosystem). Replace `YOUR_SERVER_IP` with this server's IP or hostname.
+
+**Fresh deploy (clean rebuild + relay + nginx):** To do a full refresh (clean website build, rebuild backend + website, restart relay frps/port-api, reload nginx), use `?fresh=1` or run from repo root: `./deploy/fresh-deploy.sh`. This hits `GET /deploy?trigger=1&fresh=1` on the builder. Ensure the deploy user can reload nginx (see `deploy/sudoers-ihostmc-builder` — add nginx -t and systemctl reload nginx if needed).

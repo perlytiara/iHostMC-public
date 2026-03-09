@@ -6,3 +6,5 @@
 ubuntu ALL=(ALL) NOPASSWD: /usr/bin/systemctl daemon-reload
 ubuntu ALL=(ALL) NOPASSWD: /usr/bin/systemctl restart ihostmc-backend
 ubuntu ALL=(ALL) NOPASSWD: /usr/bin/systemctl restart ihostmc-website
+ubuntu ALL=(ALL) NOPASSWD: /usr/sbin/nginx -t
+ubuntu ALL=(ALL) NOPASSWD: /usr/bin/systemctl reload nginx

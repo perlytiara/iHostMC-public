@@ -1,7 +1,7 @@
 #!/usr/bin/env python3
 """
 iHostMC frp port-assignment API. Same behavior as main.go.
-Usage: FRP_API_TOKEN=xxx FRP_ALLOWED_HOST=ihostmc.duckdns.org python3 port_api.py
+Usage: FRP_API_TOKEN=xxx FRP_ALLOWED_HOST=play.ihost.one python3 port_api.py
 Listens on :8080 by default (set FRP_API_ADDR to change).
 """
 import json

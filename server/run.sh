@@ -1,5 +1,5 @@
 #!/bin/bash
-# Run frp port-api and frps from iHostMC/server on this machine (ihostmc.duckdns.org)
+# Run frp port-api and frps from iHostMC/server on this machine (play.ihost.one)
 set -e
 cd "$(dirname "$0")"
 

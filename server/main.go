@@ -22,7 +22,7 @@ const (
 
 type Config struct {
 	Token      string
-	AllowedHost string // optional: only accept requests with this Host (e.g. ihostmc.duckdns.org)
+	AllowedHost string // optional: only accept requests with this Host (e.g. play.ihost.one)
 	PortMin   int
 	PortMax   int
 	Addr      string
@@ -44,7 +44,7 @@ var (
 func loadConfig() Config {
 	c := Config{
 		Token:       os.Getenv("FRP_API_TOKEN"),
-		AllowedHost: os.Getenv("FRP_ALLOWED_HOST"), // e.g. ihostmc.duckdns.org
+		AllowedHost: os.Getenv("FRP_ALLOWED_HOST"), // e.g. play.ihost.one
 		PortMin:     defaultPortMin,
 		PortMax:     defaultPortMax,
 		Addr:        defaultAddr,

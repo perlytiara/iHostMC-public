@@ -44,10 +44,26 @@ export interface FrpPrefs {
   token: string;
 }
 
+/** Migrate stale DuckDNS relay URLs to play.ihost.one (one-time). */
+function migrateLegacyPrefs(): void {
+  if (typeof localStorage === "undefined") return;
+  const apiBase = localStorage.getItem(KEY_FRP_API_BASE) ?? "";
+  const serverAddr = localStorage.getItem(KEY_FRP_SERVER_ADDR) ?? "";
+  if (apiBase.includes("ihostmc.duckdns.org") || apiBase.includes("ihostmc-api.duckdns.org")) {
+    localStorage.setItem(KEY_FRP_API_BASE, _defaultServer.apiBaseUrl);
+  }
+  if (serverAddr.includes("ihostmc.duckdns.org") || serverAddr.includes("ihostmc-api.duckdns.org")) {
+    localStorage.setItem(KEY_FRP_SERVER_ADDR, _defaultServer.serverAddr);
+  }
+}
+
+let _migrated = false;
+
 export function getFrpPrefs(): FrpPrefs {
   if (typeof localStorage === "undefined") {
     return getDefaultFrpServer();
   }
+  if (!_migrated) { _migrated = true; migrateLegacyPrefs(); }
   const defaultServer = getDefaultFrpServer();
   const apiBase = localStorage.getItem(KEY_FRP_API_BASE);
   const serverAddr = localStorage.getItem(KEY_FRP_SERVER_ADDR);

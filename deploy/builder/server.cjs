@@ -10,7 +10,7 @@
  *
  * Triggers:
  *   - GitHub webhook: POST <GITHUB_WEBHOOK_PATH> (Content-Type: application/json, X-Hub-Signature-256 if secret set)
- *   - Manual: POST /deploy or GET /deploy?trigger=1 (optional ?build=1 to force rebuild)
+ *   - Manual: POST /deploy or GET /deploy?trigger=1 (optional ?build=1 to force rebuild; ?fresh=1 = full clean + rebuild + relay + nginx reload)
  *   - Polling: every POLL_INTERVAL_MS if set (e.g. 120000 = 2 min)
  *
  * Env: REPO_ROOT, BUILDER_PORT, DEPLOY_BRANCH, GITHUB_WEBHOOK_SECRET, GITHUB_WEBHOOK_PATH, POLL_INTERVAL_MS,
@@ -112,7 +112,7 @@ function hasNewCommits() {
   }
 }
 
-function runDeploy(forceRebuild = false) {
+function runDeploy(forceRebuild = false, freshDeploy = false) {
   if (deployInProgress) {
     log("deploy", "Already in progress, skipping.");
     return { ok: false, reason: "deploy_already_in_progress" };
@@ -181,7 +181,7 @@ function runDeploy(forceRebuild = false) {
     }
 
     if (before === after && !process.env.BUILDER_FORCE_REBUILD && !forceRebuild) {
-      log("deploy", "No new commits, skipping build (use ?build=1 to force rebuild).");
+      log("deploy", "No new commits, skipping build (use ?build=1 or ?fresh=1 to force rebuild).");
     } else {
       log("deploy", "Building backend...");
       execMaybe("npm ci", path.join(REPO_ROOT, "backend"));
@@ -194,11 +194,12 @@ function runDeploy(forceRebuild = false) {
       const websiteDir = path.join(REPO_ROOT, "website");
       const nextDir = path.join(websiteDir, ".next");
       const nodeModulesDir = path.join(websiteDir, "node_modules");
-      if (fs.existsSync(nextDir)) {
+      const doCleanWebsite = freshDeploy || fs.existsSync(nextDir);
+      if (doCleanWebsite && fs.existsSync(nextDir)) {
         log("deploy", "Removing website/.next for clean build (avoids ChunkLoadError after deploy)");
         fs.rmSync(nextDir, { recursive: true });
       }
-      if (fs.existsSync(nodeModulesDir)) {
+      if ((freshDeploy || fs.existsSync(nextDir)) && fs.existsSync(nodeModulesDir)) {
         log("deploy", "Removing website/node_modules for clean npm ci");
         fs.rmSync(nodeModulesDir, { recursive: true });
       }
@@ -233,6 +234,31 @@ function runDeploy(forceRebuild = false) {
       } catch (e) {
         log("deploy", "Systemd restart failed for", svc, e.message);
         result.steps.push({ systemd: svc, error: e.message });
+      }
+    }
+
+    // Restart relay (frps + port-api) so server/.env (e.g. FRP_ALLOWED_HOST=play.ihost.one) is picked up
+    const serverDir = path.join(REPO_ROOT, "server");
+    if (fs.existsSync(path.join(serverDir, "ecosystem.config.cjs"))) {
+      try {
+        execMaybe("pm2 restart ihostmc-relay-frps ihostmc-relay-port-api", serverDir);
+        log("deploy", "Relay PM2 restarted (frps, port-api)");
+        result.steps.push({ relay_pm2: "ok" });
+      } catch (e) {
+        log("deploy", "Relay PM2 restart skipped or failed (not critical):", e.message);
+        result.steps.push({ relay_pm2: "skipped", message: e.message });
+      }
+    }
+
+    if (freshDeploy) {
+      try {
+        execMaybe("sudo nginx -t");
+        execMaybe("sudo systemctl reload nginx");
+        log("deploy", "Nginx reloaded");
+        result.steps.push({ nginx_reload: "ok" });
+      } catch (e) {
+        log("deploy", "Nginx reload skipped or failed:", e.message);
+        result.steps.push({ nginx_reload: "skipped", message: e.message });
       }
     }
 
@@ -318,11 +344,13 @@ const server = http.createServer((req, res) => {
 
   const deployPath = req.url?.split("?")[0];
   const isDeploy = deployPath === "/deploy";
-  const forceRebuild = req.url && /[?&]build=1|[?&]force=1/.test(req.url);
+  const forceRebuild = req.url && /[?&]build=1|[?&]force=1|[?&]fresh=1/.test(req.url);
+  const freshDeploy = req.url && /[?&]fresh=1/.test(req.url);
   const trigger = req.url && /[?&]trigger=1/.test(req.url);
   if (isDeploy && (req.method === "POST" || (req.method === "GET" && trigger))) {
-    if (forceRebuild) log("deploy", "Force rebuild requested");
-    const result = runDeploy(forceRebuild);
+    if (freshDeploy) log("deploy", "Fresh deploy requested (clean + rebuild + relay + nginx)");
+    else if (forceRebuild) log("deploy", "Force rebuild requested");
+    const result = runDeploy(forceRebuild, freshDeploy);
     res.writeHead(200, { "Content-Type": "application/json" });
     res.end(JSON.stringify(result));
     return;
