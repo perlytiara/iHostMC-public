@@ -289,7 +289,10 @@ async fn start_frp_blocking(
 
     let user_id = uuid::Uuid::new_v4().simple().to_string();
     let toml = format!(
-        r#"serverAddr = "{}"
+        r#"# Stay alive and retry when frps restarts or connection drops
+loginFailExit = false
+
+serverAddr = "{}"
 serverPort = {}
 auth.method = "token"
 auth.token = "{}"
