@@ -46,7 +46,12 @@
     "longDescription": "Cross-platform Minecraft server management with mod/plugin browsing.",
     "createUpdaterArtifacts": true
   },
-  "plugins":{"deep-link":{"desktop":{"schemes":["ihostmc"]}},
+  "plugins": {
+    "deep-link": {
+      "desktop": {
+        "schemes": ["ihostmc"]
+      }
+    },
     "updater": {
       "pubkey": "REPLACE_WITH_PUBLIC_KEY",
       "endpoints": [

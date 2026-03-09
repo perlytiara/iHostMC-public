@@ -1,6 +1,6 @@
 # iHostMC – Minecraft Server Manager
 
-Cross-platform Minecraft server manager (Windows-first) with GUI, embedded terminal, and mod/plugin browsing.
+Cross-platform Minecraft server manager (Windows-first) with GUI, embedded terminal, and mod/plugin browsing. App-only (no backend required for local use).
 
 ## Stack
 
@@ -17,6 +17,9 @@ Cross-platform Minecraft server manager (Windows-first) with GUI, embedded termi
 ## Run
 
 ```bash
+git clone https://github.com/perlytiara/iHostMC.git
+cd iHostMC
+cp .env.public.example .env
 npm install
 npm run tauri dev
 ```
@@ -37,6 +40,8 @@ npm run tauri build
 ```
 
 For release builds that create updater artifacts, set `TAURI_SIGNING_PRIVATE_KEY` (path to your private key or its contents) so the built app can offer in-app updates.
+
+Public build: `npm run build:public`
 
 ### Windows: Code-Signatur (SmartScreen)
 
