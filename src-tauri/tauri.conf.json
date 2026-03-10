@@ -1,8 +1,8 @@
 {
   "$schema": "https://schema.tauri.app/config/2",
   "productName": "iHostMC",
-  "version": "1.0.0",
-  "identifier": "com.ihostmc.app",
+  "version": "0.5.0",
+  "identifier": "com.ihostmc.desktop",
   "build": {
     "frontendDist": "../dist",
     "devUrl": "http://localhost:1420",
@@ -31,10 +31,15 @@
     "targets": "all",
     "icon": ["icons/icon.ico"],
     "windows": {
+      "webviewInstallMode": {
+        "type": "offlineInstaller",
+        "silent": true
+      },
       "nsis": {
         "installerIcon": "icons/icon.ico",
         "headerImage": null,
-        "sidebarImage": null
+        "sidebarImage": null,
+        "installMode": "both"
       },
       "wix": null
     },
@@ -44,7 +49,7 @@
     "category": "Game",
     "shortDescription": "Minecraft server manager",
     "longDescription": "Cross-platform Minecraft server management with mod/plugin browsing.",
-    "createUpdaterArtifacts": false
+    "createUpdaterArtifacts": true
   },
   "plugins": {
     "deep-link": {
@@ -53,6 +58,7 @@
       }
     },
     "updater": {
+      "pubkey": "dW50cnVzdGVkIGNvbW1lbnQ6IG1pbmlzaWduIHB1YmxpYyBrZXk6IEYxQzUxMjQ4MTlEQTk0NDAKUldSQWxOb1pTQkxGOFpiM0Y4cDRGWGJrd3ordWNWa0E3R2kwMElVaXZremwwR3grYkxWanNOVVYK",
       "endpoints": [
         "https://github.com/perlytiara/iHostMC/releases/latest/download/latest.json"
       ]

@@ -901,13 +901,6 @@ pub fn get_system_ram_mb() -> Result<u64, String> {
     Ok(sys.available_memory() / (1024 * 1024))
 }
 
-/// Resolve Java path. Prefers Java 21+ (required for Minecraft 1.21+). Downloads if none found or all too old.
-async fn ensure_java_available(
-    server_java_path: Option<&str>,
-) -> Result<std::path::PathBuf, String> {
-    ensure_java_available_logged(server_java_path, None).await
-}
-
 async fn ensure_java_available_logged(
     server_java_path: Option<&str>,
     app: Option<&AppHandle>,
@@ -1560,7 +1553,11 @@ fn classify_path(path: &str) -> FileCategory {
     if path.starts_with(CACHE_PREFIX) || path.starts_with(LOGS_PREFIX) {
         return FileCategory::Cache;
     }
-    if first == "world" || first.starts_with("world_") || first == "DIM-1" || first == "DIM1" {
+    if first == WORLD_PREFIX
+        || first.starts_with(&format!("{}_", WORLD_PREFIX))
+        || first == "DIM-1"
+        || first == "DIM1"
+    {
         return FileCategory::World;
     }
     if path == "server.properties"
