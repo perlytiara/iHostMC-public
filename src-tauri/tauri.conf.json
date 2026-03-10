@@ -2,7 +2,7 @@
   "$schema": "https://schema.tauri.app/config/2",
   "productName": "iHostMC",
   "version": "0.5.0",
-  "identifier": "com.ihostmc.app",
+  "identifier": "com.ihostmc.desktop",
   "build": {
     "frontendDist": "../dist",
     "devUrl": "http://localhost:1420",
@@ -42,7 +42,8 @@
       "nsis": {
         "installerIcon": "icons/icon.ico",
         "headerImage": null,
-        "sidebarImage": null
+        "sidebarImage": null,
+        "installMode": "both"
       },
       "wix": null
     },
@@ -63,7 +64,7 @@
       }
     },
     "updater": {
-      "pubkey": "dW50cnVzdGVkIGNvbW1lbnQ6IG1pbmlzaWduIHB1YmxpYyBrZXk6IDkwMTMyQUZENDAxQkJBODIKUldTQ3VodEEvU29Ua0YyUnYxOHdEc2NQUWpvNW1HWG9uc1ZTelF3a2R3bEtqZ0g5bERjWlFkZGEK",
+      "pubkey": "dW50cnVzdGVkIGNvbW1lbnQ6IG1pbmlzaWduIHB1YmxpYyBrZXk6IEYxQzUxMjQ4MTlEQTk0NDAKUldSQWxOb1pTQkxGOFpiM0Y4cDRGWGJrd3ordWNWa0E3R2kwMElVaXZremwwR3grYkxWanNOVVYK",
       "endpoints": [
         "https://github.com/perlytiara/iHostMC/releases/latest/download/latest.json"
       ]

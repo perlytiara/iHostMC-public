@@ -235,5 +235,5 @@ fn crash_log_dir() -> Option<std::path::PathBuf> {
         let _ = std::env::var_os("HOME");
         None
     }
-    .map(|p| p.join("com.ihostmc.app"))
+    .map(|p| p.join("com.ihostmc.desktop"))
 }
