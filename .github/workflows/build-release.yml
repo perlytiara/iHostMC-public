@@ -51,7 +51,7 @@ jobs:
           body: |
             Windows release. Install the setup exe or MSI.
             **Share server** and in-app updates work with this build.
-          draft: true
+          draft: false
           files: |
             src-tauri/target/release/bundle/msi/*.msi
             src-tauri/target/release/bundle/nsis/*.exe
