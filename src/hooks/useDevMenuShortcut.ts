@@ -7,7 +7,6 @@ export function useDevMenuShortcut(onOpen: () => void) {
 
   const handleKeyDown = useCallback(
     (e: KeyboardEvent) => {
-      if (import.meta.env.VITE_PUBLIC_REPO === "true") return;
       if (!e.ctrlKey || !e.shiftKey) return;
       const key = e.key.toLowerCase();
       if (key === "d") {

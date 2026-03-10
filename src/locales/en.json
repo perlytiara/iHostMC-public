@@ -650,7 +650,7 @@
     "backendNotConfigured": "Backend not configured. Set VITE_API_BASE_URL to enable account and billing.",
     "developer": "Developer",
     "dev": {
-      "tabDesc": "Stripe Live/Test and dev tier override. Only visible in dev builds; not shown to customers.",
+      "tabDesc": "Stripe Live/Test and dev tier override. Requires override key from server admin.",
       "intro": "These options are for developers only. They do not appear in production builds.",
       "stripeMode": "Stripe mode",
       "stripeModeDesc": "Use Test to subscribe with card 4242… (no real charges). Toggle applies to Subscribe and Manage billing.",

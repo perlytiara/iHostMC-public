@@ -483,7 +483,7 @@
     "backendNotConfigured": "Backend non configuré. Définir VITE_API_BASE_URL pour le compte et la facturation.",
     "developer": "Développeur",
     "dev": {
-      "tabDesc": "Stripe Live/Test et override de palier dev. Visible uniquement en build dev.",
+      "tabDesc": "Stripe Live/Test et override de palier dev. Nécessite une clé override de l'admin serveur.",
       "intro": "Ces options sont réservées aux développeurs. Elles n'apparaissent pas en production.",
       "stripeMode": "Mode Stripe",
       "stripeModeDesc": "Utiliser Test pour la carte 4242… (aucun prélèvement réel). S'applique à S'abonner et Gérer la facturation.",

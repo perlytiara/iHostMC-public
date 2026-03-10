@@ -483,7 +483,7 @@
     "backendNotConfigured": "Backend nicht konfiguriert. Setze VITE_API_BASE_URL für Konto und Abrechnung.",
     "developer": "Entwickler",
     "dev": {
-      "tabDesc": "Stripe Live/Test und Dev-Tier-Override. Nur in Dev-Builds sichtbar.",
+      "tabDesc": "Stripe Live/Test und Dev-Tier-Override. Erfordert Override-Key vom Server-Admin.",
       "intro": "Diese Optionen sind nur für Entwickler. In Produktions-Builds werden sie nicht angezeigt.",
       "stripeMode": "Stripe-Modus",
       "stripeModeDesc": "Test für Karte 4242… (keine echten Abbuchungen). Gilt für Abonnieren und Abrechnung verwalten.",

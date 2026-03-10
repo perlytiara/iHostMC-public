@@ -131,7 +131,7 @@ function getStoredPage(): AppPage {
   if (typeof window === "undefined") return "home";
   const saved = localStorage.getItem(PAGE_STORAGE_KEY) as AppPage | null;
   if (saved === "home" || saved === "servers" || saved === "storage" || saved === "ai" || saved === "settings") return saved;
-  if (saved === "dev" && import.meta.env.DEV && import.meta.env.VITE_PUBLIC_REPO !== "true") return "dev";
+  if (saved === "dev" && import.meta.env.DEV) return "dev";
   return "home";
 }
 
@@ -443,7 +443,7 @@ function AppContent() {
               />
             </PageTransition>
           )}
-          {currentPage === "dev" && import.meta.env.DEV && import.meta.env.VITE_PUBLIC_REPO !== "true" && (
+          {currentPage === "dev" && import.meta.env.DEV && (
             <PageTransition pageKey="dev">
               <DevPage onOpenWindowTools={() => setWindowToolsOpen(true)} />
             </PageTransition>
@@ -452,9 +452,7 @@ function AppContent() {
         </PageErrorBoundary>
       </main>
 
-      {import.meta.env.VITE_PUBLIC_REPO !== "true" && (
-        <DevMenu open={devMenuOpen} onClose={() => setDevMenuOpen(false)} />
-      )}
+      <DevMenu open={devMenuOpen} onClose={() => setDevMenuOpen(false)} />
       <WindowTools open={windowToolsOpen} onClose={() => setWindowToolsOpen(false)} />
       <AppContextMenu />
       <Toaster />

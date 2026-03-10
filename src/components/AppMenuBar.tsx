@@ -274,15 +274,13 @@ export function AppMenuBar({
                   {isDownloadingUpdate ? t("header.downloading") : t("header.install")}
                 </DropdownMenu.Item>
               )}
-              {import.meta.env.VITE_PUBLIC_REPO !== "true" && (
-                <>
-                  <DropdownMenu.Separator className="my-1 h-px bg-border" />
-                  <DropdownMenu.Item className={itemClass} onSelect={onDevMenu}>
-                    <Bug className="h-4 w-4" />
-                    {t("menu.devMenu")}
-                  </DropdownMenu.Item>
-                </>
-              )}
+              <>
+                <DropdownMenu.Separator className="my-1 h-px bg-border" />
+                <DropdownMenu.Item className={itemClass} onSelect={onDevMenu}>
+                  <Bug className="h-4 w-4" />
+                  {t("menu.devMenu")}
+                </DropdownMenu.Item>
+              </>
             </DropdownMenu.Content>
           </DropdownMenu.Portal>
         </DropdownMenu.Root>

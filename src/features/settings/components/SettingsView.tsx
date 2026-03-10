@@ -60,10 +60,10 @@ const BASE_TABS: { id: SettingsTab; icon: typeof Settings; labelKey: string }[] 
   { id: "about", icon: Info, labelKey: "settings.about" },
 ];
 
-const tabs: { id: SettingsTab; icon: typeof Settings; labelKey: string }[] =
-  import.meta.env.DEV
-    ? [...BASE_TABS, { id: "developer" as const, icon: Code2, labelKey: "settings.developer" }]
-    : BASE_TABS;
+const tabs: { id: SettingsTab; icon: typeof Settings; labelKey: string }[] = [
+  ...BASE_TABS,
+  { id: "developer" as const, icon: Code2, labelKey: "settings.developer" },
+];
 
 interface SettingsViewProps {
   onClose?: () => void;

@@ -133,8 +133,8 @@ export function DevOptionsSection() {
           {t("settings.dev.intro")}
         </p>
 
-        {/* Settings as icon in navbar (dev build only) */}
-        {import.meta.env.DEV && (
+        {/* Settings as icon – only with override */}
+        {canUseDevOverride && (
           <div>
             <h4 className="text-base font-semibold text-foreground mb-1">{t("settings.dev.settingsAsIcon", { defaultValue: "Settings as icon (right side of navbar)" })}</h4>
             <p className="text-sm text-muted-foreground mb-3">{t("settings.dev.settingsAsIconDesc", { defaultValue: "When on, Settings appears as a gear icon on the right of the top bar instead of a tab. When off, Settings is a tab in the main nav." })}</p>
@@ -161,7 +161,8 @@ export function DevOptionsSection() {
           </div>
         )}
 
-        {/* Stripe Live / Test */}
+        {/* Stripe Live / Test – only with override */}
+        {canUseDevOverride && (
         <div>
           <h4 className="text-base font-semibold text-foreground mb-1">{t("settings.dev.stripeMode")}</h4>
           <p className="text-sm text-muted-foreground mb-3">{t("settings.dev.stripeModeDesc")}</p>
@@ -190,8 +191,9 @@ export function DevOptionsSection() {
             {stripeModeLoading && <span className="text-xs text-muted-foreground">…</span>}
           </div>
         </div>
+        )}
 
-        {/* Dev tier override */}
+        {/* Dev tier override – only with override */}
         {canUseDevOverride && (
           <div>
             <h4 className="text-base font-semibold text-foreground mb-1">{t("settings.dev.switchTier")}</h4>
@@ -239,8 +241,8 @@ export function DevOptionsSection() {
           <p className="text-sm text-muted-foreground">{t("settings.dev.overrideNotAllowed")}</p>
         )}
 
-        {/* Simulate storage almost full (dev only) */}
-        {import.meta.env.DEV && (
+        {/* Simulate storage almost full – only with override */}
+        {canUseDevOverride && (
           <div>
             <h4 className="text-base font-semibold text-foreground mb-1">
               {t("settings.dev.simulateStorageFull")}
@@ -278,8 +280,8 @@ export function DevOptionsSection() {
           </div>
         )}
 
-        {/* Unlimited usage (dev only) */}
-        {import.meta.env.DEV && (
+        {/* Unlimited usage – only with override */}
+        {canUseDevOverride && (
           <div>
             <h4 className="text-base font-semibold text-foreground mb-1">
               {t("settings.dev.unlimitedUsage")}

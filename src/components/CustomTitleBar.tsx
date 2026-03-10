@@ -215,11 +215,9 @@ export function CustomTitleBar({
                 <DropdownMenu.Item className={itemClass} onSelect={onWindowTools}>
                   <Wrench className="h-3.5 w-3.5" /> {t("menu.tools")}
                 </DropdownMenu.Item>
-                {import.meta.env.VITE_PUBLIC_REPO !== "true" && (
-                  <DropdownMenu.Item className={itemClass} onSelect={onDevMenu}>
-                    <Bug className="h-3.5 w-3.5" /> {t("menu.devMenu")}
-                  </DropdownMenu.Item>
-                )}
+                <DropdownMenu.Item className={itemClass} onSelect={onDevMenu}>
+                  <Bug className="h-3.5 w-3.5" /> {t("menu.devMenu")}
+                </DropdownMenu.Item>
               </DropdownMenu.Content>
             </DropdownMenu.Portal>
           </DropdownMenu.Root>

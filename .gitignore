@@ -3,4 +3,9 @@ dist/
 src-tauri/target/
 .env
 .env.local
+.env.gh-secrets
 *.log
+
+# Tauri signing keys (never commit)
+.tauri_signing_key
+.tauri_signing_key.pub
