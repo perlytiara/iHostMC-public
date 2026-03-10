@@ -32,6 +32,15 @@ jobs:
       - name: Install dependencies
         run: npm ci
 
+      - name: Verify updater signing key
+        run: |
+          node -e "require('fs').writeFileSync('.tauri-sign-verify-tmp.txt', '')"
+          npx tauri signer sign .tauri-sign-verify-tmp.txt
+          node -e "const fs=require('fs'); fs.unlinkSync('.tauri-sign-verify-tmp.txt'); fs.unlinkSync('.tauri-sign-verify-tmp.txt.sig');"
+        env:
+          TAURI_SIGNING_PRIVATE_KEY: ${{ secrets.TAURI_SIGNING_PRIVATE_KEY }}
+          TAURI_SIGNING_PRIVATE_KEY_PASSWORD: ${{ secrets.TAURI_SIGNING_PRIVATE_KEY_PASSWORD }}
+
       - name: Build Tauri (Windows)
         run: npm run build:public
         env:
