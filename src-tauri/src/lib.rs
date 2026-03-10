@@ -26,6 +26,7 @@ pub fn run() {
                     let _ = argv;
                 },
             ))
+            .plugin(tauri_plugin_updater::Builder::new().build())
             .plugin(tauri_plugin_autostart::init(
                 tauri_plugin_autostart::MacosLauncher::LaunchAgent,
                 Some(vec![]),
@@ -184,19 +185,18 @@ pub fn run() {
         });
 }
 
-fn write_crash_log(msg: &str) {
-    #[cfg(target_os = "windows")]
-    {
-        if let Some(appdata) = std::env::var_os("APPDATA") {
-            let dir = std::path::Path::new(&appdata).join("com.ihostmc.app");
-            let _ = std::fs::create_dir_all(&dir);
+/// Writes a crash/error line to the app log file. Returns true if written to file, false otherwise.
+pub fn write_crash_log(msg: &str) -> bool {
+    let dir = crash_log_dir();
+    if let Some(dir) = dir {
+        if std::fs::create_dir_all(&dir).is_ok() {
             if let Ok(mut f) = std::fs::OpenOptions::new()
                 .create(true)
                 .append(true)
                 .open(dir.join("crash.log"))
             {
                 use std::io::Write;
-                let _ = writeln!(f, "{msg}");
+                return writeln!(f, "{msg}").is_ok();
             }
         }
     }
@@ -204,4 +204,36 @@ fn write_crash_log(msg: &str) {
     {
         eprintln!("{msg}");
     }
+    false
+}
+
+/// Returns the app data/config directory for crash logs. Cross-platform.
+fn crash_log_dir() -> Option<std::path::PathBuf> {
+    #[cfg(target_os = "windows")]
+    {
+        std::env::var_os("APPDATA").map(std::path::PathBuf::from)
+    }
+    #[cfg(target_os = "macos")]
+    {
+        std::env::var_os("HOME").map(|h| {
+            std::path::Path::new(&h)
+                .join("Library")
+                .join("Application Support")
+        })
+    }
+    #[cfg(all(unix, not(target_os = "macos")))]
+    {
+        std::env::var_os("XDG_CONFIG_HOME")
+            .map(std::path::PathBuf::from)
+            .or_else(|| {
+                std::env::var_os("HOME")
+                    .map(|h| std::path::Path::new(&h).join(".config"))
+            })
+    }
+    #[cfg(not(any(windows, target_os = "macos", unix)))]
+    {
+        let _ = std::env::var_os("HOME");
+        None
+    }
+    .map(|p| p.join("com.ihostmc.app"))
 }
