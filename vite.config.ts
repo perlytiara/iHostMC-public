@@ -4,6 +4,7 @@ import react from "@vitejs/plugin-react";
 import { fileURLToPath, URL } from "node:url";
 
 export default defineConfig({
+  base: "./",
   plugins: [react()],
   test: {
     environment: "jsdom",
@@ -25,5 +26,10 @@ export default defineConfig({
   },
   optimizeDeps: {
     entries: ["src/main.tsx"],
+  },
+  build: {
+    commonjsOptions: {
+      transformMixedEsModules: true,
+    },
   },
 });
