@@ -1,7 +1,0 @@
-# iHostMC FRP – only for custom relay (your own VPS)
-# The default public relay (play.ihost.one) uses the token from the repo – no paste needed in the app.
-
-For a custom server, set in the app (Settings → Network → FRP):
-- FRP API base URL, server address, port, and your token.
-
-Public relay (default): just choose FRP and use "Share server"; token is built-in.

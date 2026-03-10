@@ -110,6 +110,12 @@
     "testMode": "Mode test :",
     "openTestControl": "Ouvrir la console de test (navigateur)"
   },
+  "updateDialog": {
+    "title": "Mise à jour disponible",
+    "description": "iHostMC v{{version}} est disponible. Redémarrer maintenant pour installer la mise à jour ?",
+    "later": "Plus tard",
+    "restartToUpdate": "Redémarrer pour mettre à jour"
+  },
   "devMenu": {
     "title": "Menu développeur",
     "openShortcut": "Ouvrir : Ctrl+Maj+D ou 1+2",

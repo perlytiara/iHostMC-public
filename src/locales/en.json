@@ -194,6 +194,12 @@
     "testMode": "Test mode:",
     "openTestControl": "Open test control (browser)"
   },
+  "updateDialog": {
+    "title": "Update available",
+    "description": "iHostMC v{{version}} is available. Restart now to install the update?",
+    "later": "Later",
+    "restartToUpdate": "Restart to update"
+  },
   "devMenu": {
     "title": "Dev menu",
     "openShortcut": "Open: Ctrl+Shift+D or 1+2",

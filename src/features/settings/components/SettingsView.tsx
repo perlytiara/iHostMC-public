@@ -27,6 +27,7 @@ import { AccountSection } from "./AccountSection";
 import { BackupSyncSection } from "./BackupSyncSection";
 import { DevOptionsSection } from "./DevOptionsSection";
 import { cn } from "@/lib/utils";
+import { APP_VERSION } from "@/lib/version.generated";
 import { useCallback, useEffect, useRef, useState } from "react";
 import { useTranslation } from "react-i18next";
 import { invoke } from "@tauri-apps/api/core";
@@ -486,7 +487,7 @@ export function SettingsView({ onClose, onEnsureAccountVisible, runInBackground 
                   <AppLogo size={72} />
                   <div>
                     <p className="text-sm font-bold">iHostMC</p>
-                    <p className="text-xs text-muted-foreground">{t("common.version")}</p>
+                    <p className="text-xs text-muted-foreground">v{APP_VERSION}</p>
                   </div>
                 </div>
                 <p className="text-xs text-muted-foreground">{t("settings.aboutDesc")}</p>

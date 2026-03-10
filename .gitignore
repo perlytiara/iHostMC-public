@@ -1,42 +1,6 @@
 node_modules/
 dist/
-dist-ssr/
 src-tauri/target/
-.tauri/
-~/.tauri/
 .env
 .env.local
-.env.*.local
 *.log
-.DS_Store
-Thumbs.db
-*.tsbuildinfo
-/test-results/
-/playwright-report/
-/blob-report/
-.idea/
-.vscode/*
-!.vscode/extensions.json
-.cursor/
-
-# User data and backups (never commit)
-backups/
-
-# Next.js build output
-.next/
-
-# Backend database
-backend/data/
-
-# Server binaries and auth (secrets)
-server/frps/frps
-server/port-api
-server/IHOSTMC-AUTH.txt
-
-# Auth setup tool output (contains secrets)
-tools/ihost-auth-setup/.env.append
-tools/ihost-auth-setup/.auth-setup-progress.json
-
-
-# Public repo export
-export/

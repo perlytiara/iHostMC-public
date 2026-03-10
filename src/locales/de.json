@@ -68,6 +68,12 @@
     "testMode": "Testmodus:",
     "openTestControl": "Test-Steuerung öffnen (Browser)"
   },
+  "updateDialog": {
+    "title": "Update verfügbar",
+    "description": "iHostMC v{{version}} ist verfügbar. Jetzt neu starten, um zu aktualisieren?",
+    "later": "Später",
+    "restartToUpdate": "Neu starten und aktualisieren"
+  },
   "devMenu": {
     "title": "Dev-Menü",
     "openShortcut": "Öffnen: Strg+Umsch+D oder 1+2",

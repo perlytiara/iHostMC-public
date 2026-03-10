@@ -1212,9 +1212,9 @@ pub fn rename_server(id: String, new_name: String) -> Result<(), String> {
 }
 
 #[tauri::command]
-pub fn open_devtools(window: tauri::WebviewWindow) {
+pub fn open_devtools(_window: tauri::WebviewWindow) {
     #[cfg(debug_assertions)]
-    let _ = window.open_devtools();
+    let _ = _window.open_devtools();
 }
 
 #[tauri::command]

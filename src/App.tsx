@@ -9,6 +9,7 @@ import { AppContextMenu } from "@/components/AppContextMenu";
 import { Toaster } from "@/components/Toaster";
 import { LoadingScreen } from "@/components/LoadingScreen";
 import { OnboardingOverlay } from "@/components/OnboardingOverlay";
+import { UpdateAvailableDialog } from "@/components/UpdateAvailableDialog";
 import { useDevMenuShortcut } from "@/hooks/useDevMenuShortcut";
 import { useInspectShortcut } from "@/hooks/useInspectShortcut";
 import { useDeepLinkAuth } from "@/features/auth/hooks/useDeepLinkAuth";
@@ -145,6 +146,7 @@ function AppContent() {
   const [runInBackground, setRunInBackground] = useState(true);
   const [testControlUrl, setTestControlUrl] = useState<string | null>(null);
   const [updateAvailable, setUpdateAvailable] = useState<{ version: string; body: string | null } | null>(null);
+  const [updateDialogDismissed, setUpdateDialogDismissed] = useState(false);
   const [downloading, setDownloading] = useState(false);
   const [serverCount, setServerCount] = useState(0);
   const [runningCount, setRunningCount] = useState(0);
@@ -245,7 +247,10 @@ function AppContent() {
     if (!isTauri()) return;
     check()
       .then((upd) => {
-        if (upd) setUpdateAvailable({ version: upd.version, body: upd.body ?? null });
+        if (upd) {
+          setUpdateAvailable({ version: upd.version, body: upd.body ?? null });
+          setUpdateDialogDismissed(false); // show dialog for new update
+        }
       })
       .catch(() => {});
   }, []);
@@ -275,6 +280,8 @@ function AppContent() {
       setDownloading(false);
     }
   }, [updateAvailable, downloading]);
+
+  const showUpdateDialog = !!updateAvailable && !updateDialogDismissed && isTauri();
 
   const handleExit = useCallback(() => {
     if (isTauri()) {
@@ -343,7 +350,17 @@ function AppContent() {
         isDownloadingUpdate={downloading}
       />
 
-      {updateAvailable && (
+      {updateAvailable && isTauri() && (
+        <UpdateAvailableDialog
+          open={showUpdateDialog}
+          onOpenChange={(open) => !open && setUpdateDialogDismissed(true)}
+          update={updateAvailable}
+          onInstall={handleInstallUpdate}
+          onLater={() => setUpdateDialogDismissed(true)}
+          isDownloading={downloading}
+        />
+      )}
+      {updateAvailable && isTauri() && (
         <div className="flex items-center justify-center gap-2 border-b border-emerald-500/30 bg-emerald-500/10 px-6 py-1.5 text-xs text-emerald-800 dark:text-emerald-300">
           <span>{t("header.updateAvailable", { version: updateAvailable.version })}</span>
           <button

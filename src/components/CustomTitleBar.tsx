@@ -27,6 +27,7 @@ import {
 } from "lucide-react";
 import { useContext } from "react";
 import { cn, isTauri } from "@/lib/utils";
+import { APP_VERSION } from "@/lib/version.generated";
 import { getCurrentWindow } from "@tauri-apps/api/window";
 import * as DropdownMenu from "@radix-ui/react-dropdown-menu";
 import type { AppPage } from "@/App";
@@ -193,7 +194,7 @@ export function CustomTitleBar({
                   <Info className="h-3.5 w-3.5" /> {t("menu.about")} iHostMC
                 </DropdownMenu.Item>
                 <DropdownMenu.Item className={itemClass} disabled>
-                  {t("menu.version")}: {t("common.version")}
+                  {t("menu.version")}: v{APP_VERSION}
                 </DropdownMenu.Item>
                 {onCheckForUpdates && (
                   <DropdownMenu.Item className={itemClass} onSelect={onCheckForUpdates}>
@@ -294,7 +295,7 @@ export function CustomTitleBar({
                 <p className="mt-0.5">{t("menu.aboutDescription")}</p>
               </div>
               <div className="px-2.5 py-1.5 text-[11px] text-muted-foreground border-b border-border mb-1">
-                {t("menu.version")}: {t("common.version")}
+                {t("menu.version")}: v{APP_VERSION}
               </div>
               <DropdownMenu.Item className={itemClass} onSelect={() => onNavigate("storage")}>
                 <FolderArchive className="h-3.5 w-3.5" /> {t("nav.storage")}

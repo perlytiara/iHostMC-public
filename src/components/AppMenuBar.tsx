@@ -25,6 +25,7 @@ import {
   LogOut,
 } from "lucide-react";
 import { cn } from "@/lib/utils";
+import { APP_VERSION } from "@/lib/version.generated";
 
 export interface MenuBarServerContext {
   hasServerSelected: boolean;
@@ -261,7 +262,7 @@ export function AppMenuBar({
                 {t("menu.about")} iHostMC
               </DropdownMenu.Item>
               <DropdownMenu.Item className={itemClass} disabled>
-                {t("menu.version")}: {t("common.version")}
+                {t("menu.version")}: v{APP_VERSION}
               </DropdownMenu.Item>
               {updateAvailable && (
                 <DropdownMenu.Item
@@ -299,7 +300,7 @@ export function AppMenuBar({
           <Moon className={cn("absolute h-4 w-4 rotate-90 scale-0 transition-all dark:rotate-0 dark:scale-100")} />
         </Button>
         <span className="rounded bg-muted px-2 py-0.5 text-xs text-muted-foreground">
-          {t("common.version")}
+          v{APP_VERSION}
         </span>
       </div>
     </div>

@@ -11,7 +11,9 @@
   },
   "app": {
     "withGlobalTauri": true,
-    "security": { "csp": null },
+    "security": {
+      "csp": null
+    },
     "windows": [
       {
         "label": "main",
@@ -29,7 +31,9 @@
   "bundle": {
     "active": true,
     "targets": "all",
-    "icon": ["icons/icon.ico"],
+    "icon": [
+      "icons/icon.ico"
+    ],
     "windows": {
       "webviewInstallMode": {
         "type": "offlineInstaller",
@@ -54,11 +58,13 @@
   "plugins": {
     "deep-link": {
       "desktop": {
-        "schemes": ["ihostmc"]
+        "schemes": [
+          "ihostmc"
+        ]
       }
     },
     "updater": {
-      "pubkey": "dW50cnVzdGVkIGNvbW1lbnQ6IG1pbmlzaWduIHB1YmxpYyBrZXk6IEYxQzUxMjQ4MTlEQTk0NDAKUldSQWxOb1pTQkxGOFpiM0Y4cDRGWGJrd3ordWNWa0E3R2kwMElVaXZremwwR3grYkxWanNOVVYK",
+      "pubkey": "dW50cnVzdGVkIGNvbW1lbnQ6IG1pbmlzaWduIHB1YmxpYyBrZXk6IDBCRDNBRjU1NDY5ODkyMjAKUldRZ2twaEdWYS9UQzJhczJxczRYbThBRkl2UU9ZR3lFcWttUURPMXZjOS94cTRnY0pud3pONHIK",
       "endpoints": [
         "https://github.com/perlytiara/iHostMC/releases/latest/download/latest.json"
       ]

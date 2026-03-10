@@ -54,18 +54,14 @@
     "vitest": "^4.0.18"
   },
   "scripts": {
-    "dev": "vite",
-    "build": "vite build && node scripts/tauri-fix-dist-html.cjs",
-    "typecheck": "tsc -b",
+    "sync-version": "node scripts/sync-version.cjs",
+    "dev": "node scripts/sync-version.cjs && vite",
+    "build": "node scripts/sync-version.cjs && vite build && node scripts/tauri-fix-dist-html.cjs",
     "preview": "vite preview",
     "tauri": "node scripts/tauri-wrapper.cjs",
     "tauri:test": "cross-env IHOSTMC_TEST=1 node scripts/tauri-wrapper.cjs dev",
-    "build:public": "cross-env VITE_API_BASE_URL=https://api.ihost.one VITE_WEBSITE_URL=https://ihost.one npm run build && node scripts/tauri-wrapper.cjs build",
+    "build:public": "node scripts/sync-version.cjs && cross-env VITE_API_BASE_URL=https://api.ihost.one VITE_WEBSITE_URL=https://ihost.one npm run build && node scripts/tauri-wrapper.cjs build",
     "test": "vitest",
-    "test:run": "vitest run",
-    "test:control": "echo Open http://localhost:1422 when app runs with IHOSTMC_TEST=1",
-    "sync-relay-token": "node scripts/sync-relay-token.cjs",
-    "test:e2e": "playwright test",
-    "show-report": "playwright show-report"
+    "test:run": "vitest run"
   }
 }
