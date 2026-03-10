@@ -1,7 +1,7 @@
 {
   "name": "ihostmc",
   "private": false,
-  "version": "1.0.2",
+  "version": "1.0.3",
   "type": "module",
   "dependencies": {
     "@radix-ui/react-dialog": "^1.1.2",
@@ -55,7 +55,7 @@
   },
   "scripts": {
     "dev": "vite",
-    "build": "vite build",
+    "build": "vite build && node scripts/tauri-fix-dist-html.cjs",
     "preview": "vite preview",
     "tauri": "node scripts/tauri-wrapper.cjs",
     "tauri:test": "cross-env IHOSTMC_TEST=1 node scripts/tauri-wrapper.cjs dev",
