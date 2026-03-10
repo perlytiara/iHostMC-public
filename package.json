@@ -1,7 +1,7 @@
 {
   "name": "ihostmc",
   "private": false,
-  "version": "1.0.3",
+  "version": "1.0.4",
   "type": "module",
   "dependencies": {
     "@radix-ui/react-dialog": "^1.1.2",
