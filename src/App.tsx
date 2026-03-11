@@ -72,6 +72,19 @@ export const SettingsNavContext = createContext<SettingsNavContextValue>({
   setSettingsAsIcon: () => {},
 });
 
+const DEVELOPER_MENU_KEY = "ihostmc-developer-menu-enabled";
+const ONBOARDING_COMPLETE_KEY = "ihostmc-onboarding-complete";
+
+export interface DeveloperMenuContextValue {
+  developerMenuEnabled: boolean;
+  setDeveloperMenuEnabled: (enabled: boolean) => void;
+}
+
+export const DeveloperMenuContext = createContext<DeveloperMenuContextValue>({
+  developerMenuEnabled: false,
+  setDeveloperMenuEnabled: () => {},
+});
+
 export interface MenuBarServerContext {
   hasServerSelected: boolean;
   isRunning: boolean;
@@ -152,10 +165,25 @@ function AppContent() {
   const [runningCount, setRunningCount] = useState(0);
   const [closeConfirm, setCloseConfirm] = useState<{ runningCount: number } | null>(null);
   const [initialSettingsTab, setInitialSettingsTab] = useState<"general" | "account" | null>(null);
+  const [onboardingComplete, setOnboardingCompleteState] = useState(() =>
+    typeof window !== "undefined" && !!localStorage.getItem(ONBOARDING_COMPLETE_KEY)
+  );
+  const [developerMenuEnabled, setDeveloperMenuEnabledState] = useState(() =>
+    typeof window !== "undefined" && localStorage.getItem(DEVELOPER_MENU_KEY) === "true"
+  );
 
   const user = useAuthStore((s) => s.user);
   const prevUserRef = useRef<typeof user | undefined>(undefined);
-  useDevMenuShortcut(() => setDevMenuOpen(true));
+
+  const setDeveloperMenuEnabled = useCallback((enabled: boolean) => {
+    setDeveloperMenuEnabledState(enabled);
+    try {
+      if (enabled) localStorage.setItem(DEVELOPER_MENU_KEY, "true");
+      else localStorage.removeItem(DEVELOPER_MENU_KEY);
+    } catch {}
+  }, []);
+
+  useDevMenuShortcut(() => setDevMenuOpen(true), { enabled: developerMenuEnabled });
   useInspectShortcut();
   useDeepLinkAuth();
 
@@ -281,7 +309,8 @@ function AppContent() {
     }
   }, [updateAvailable, downloading]);
 
-  const showUpdateDialog = !!updateAvailable && !updateDialogDismissed && isTauri();
+  const showUpdateDialog =
+    !!updateAvailable && !updateDialogDismissed && isTauri() && onboardingComplete;
 
   const handleExit = useCallback(() => {
     if (isTauri()) {
@@ -333,6 +362,7 @@ function AppContent() {
 
   return (
     <SettingsNavContext.Provider value={{ settingsAsIcon, setSettingsAsIcon }}>
+    <DeveloperMenuContext.Provider value={{ developerMenuEnabled, setDeveloperMenuEnabled }}>
     <div className="flex min-h-0 min-w-0 flex-1 flex-col w-full bg-background text-foreground">
       <CustomTitleBar
         currentPage={currentPage}
@@ -467,8 +497,17 @@ function AppContent() {
           />
         )}
       </AnimatePresence>
-      <OnboardingOverlay />
+      <OnboardingOverlay
+        completed={onboardingComplete}
+        onComplete={() => {
+          setOnboardingCompleteState(true);
+          try {
+            localStorage.setItem(ONBOARDING_COMPLETE_KEY, "1");
+          } catch {}
+        }}
+      />
     </div>
+    </DeveloperMenuContext.Provider>
     </SettingsNavContext.Provider>
   );
 }

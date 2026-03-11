@@ -71,14 +71,14 @@ jobs:
           tag_name: ${{ startsWith(github.ref, 'refs/tags/') && github.ref_name || format('v{0}', steps.version.outputs.version) }}
           name: iHostMC ${{ startsWith(github.ref, 'refs/tags/') && github.ref_name || format('v{0}', steps.version.outputs.version) }}
           body: |
-            ## v0.5.2
-            - Update available dialog for in-app updates
-            - Developer tab and options in Settings (Stripe/testing behind override key)
-            - Single-repo layout: app in iHostMC submodule
+            ## v0.5.3
+            - **Tutorial first:** Update popup only shows after onboarding is complete (no more invisible overlay blocking tutorial).
+            - **Developer settings:** Tab always visible; toggle "Show Developer menu" to enable the debug menu (☰ → Developer, Ctrl+Shift+D). Stripe/tier overrides still require backend override.
+            - **Root repo:** App is built only from iHostMC; iHost root no longer runs app build in Actions.
 
             Windows release. Install the setup exe or MSI.
             **Share server** and in-app updates work with this build.
-          draft: true
+          draft: false
           files: |
             src-tauri/target/release/bundle/msi/*.msi
             src-tauri/target/release/bundle/nsis/*.exe

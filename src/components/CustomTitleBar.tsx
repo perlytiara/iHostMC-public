@@ -32,7 +32,7 @@ import { getCurrentWindow } from "@tauri-apps/api/window";
 import * as DropdownMenu from "@radix-ui/react-dropdown-menu";
 import type { AppPage } from "@/App";
 import type { MenuBarServerContext } from "@/App";
-import { SettingsNavContext } from "@/App";
+import { SettingsNavContext, DeveloperMenuContext } from "@/App";
 
 interface CustomTitleBarProps {
   currentPage: AppPage;
@@ -84,6 +84,7 @@ export function CustomTitleBar({
   const { t } = useTranslation();
   const { theme, setTheme, isDark } = useTheme();
   const { settingsAsIcon } = useContext(SettingsNavContext);
+  const { developerMenuEnabled } = useContext(DeveloperMenuContext);
 
   let win: ReturnType<typeof getCurrentWindow> | null = null;
   try {
@@ -215,9 +216,11 @@ export function CustomTitleBar({
                 <DropdownMenu.Item className={itemClass} onSelect={onWindowTools}>
                   <Wrench className="h-3.5 w-3.5" /> {t("menu.tools")}
                 </DropdownMenu.Item>
-                <DropdownMenu.Item className={itemClass} onSelect={onDevMenu}>
-                  <Bug className="h-3.5 w-3.5" /> {t("menu.devMenu")}
-                </DropdownMenu.Item>
+                {developerMenuEnabled && (
+                  <DropdownMenu.Item className={itemClass} onSelect={onDevMenu}>
+                    <Bug className="h-3.5 w-3.5" /> {t("menu.devMenu")}
+                  </DropdownMenu.Item>
+                )}
               </DropdownMenu.Content>
             </DropdownMenu.Portal>
           </DropdownMenu.Root>
@@ -330,8 +333,8 @@ export function CustomTitleBar({
               <DropdownMenu.Item className={itemClass} onSelect={onWindowTools}>
                 <Wrench className="h-3.5 w-3.5" /> {t("menu.tools")}
               </DropdownMenu.Item>
-              {import.meta.env.DEV && (
-                <DropdownMenu.Item className={itemClass} onSelect={() => onNavigate("dev")}>
+              {developerMenuEnabled && (
+                <DropdownMenu.Item className={itemClass} onSelect={onDevMenu}>
                   <Bug className="h-3.5 w-3.5" /> {t("menu.developer")}
                 </DropdownMenu.Item>
               )}
