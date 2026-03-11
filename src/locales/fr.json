@@ -112,9 +112,17 @@
   },
   "updateDialog": {
     "title": "Mise à jour disponible",
-    "description": "iHostMC v{{version}} est disponible. Redémarrer maintenant pour installer la mise à jour ?",
+    "description": "iHostMC v{{version}} est disponible. Mise à jour intégrée—pas d’installateur séparé.",
+    "updateNow": "Mettre à jour",
     "later": "Plus tard",
-    "restartToUpdate": "Redémarrer pour mettre à jour"
+    "restartToUpdate": "Redémarrer pour mettre à jour",
+    "downloading": "Téléchargement de la mise à jour",
+    "downloadingDesc": "Téléchargement de v{{version}}…",
+    "percent": "{{percent}} %",
+    "installing": "Installation",
+    "installingDesc": "Téléchargement terminé. Installation en cours…",
+    "restarting": "Redémarrage",
+    "restartingDesc": "Application de la mise à jour. L’app va rouvrir dans un instant."
   },
   "devMenu": {
     "title": "Menu développeur",

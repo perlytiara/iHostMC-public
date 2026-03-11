@@ -70,9 +70,17 @@
   },
   "updateDialog": {
     "title": "Update verfügbar",
-    "description": "iHostMC v{{version}} ist verfügbar. Jetzt neu starten, um zu aktualisieren?",
+    "description": "iHostMC v{{version}} ist verfügbar. Direkt aktualisieren—kein separates Installationsprogramm.",
+    "updateNow": "Jetzt aktualisieren",
     "later": "Später",
-    "restartToUpdate": "Neu starten und aktualisieren"
+    "restartToUpdate": "Neu starten und aktualisieren",
+    "downloading": "Update wird heruntergeladen",
+    "downloadingDesc": "v{{version}} wird heruntergeladen…",
+    "percent": "{{percent}}%",
+    "installing": "Wird installiert",
+    "installingDesc": "Update heruntergeladen. Installation läuft…",
+    "restarting": "Wird neu gestartet",
+    "restartingDesc": "Update wird angewendet. Die App öffnet sich in Kürze wieder."
   },
   "devMenu": {
     "title": "Dev-Menü",

@@ -161,6 +161,8 @@ function AppContent() {
   const [updateAvailable, setUpdateAvailable] = useState<{ version: string; body: string | null } | null>(null);
   const [updateDialogDismissed, setUpdateDialogDismissed] = useState(false);
   const [downloading, setDownloading] = useState(false);
+  const [updateProgress, setUpdateProgress] = useState<{ downloaded: number; total: number } | null>(null);
+  const [updatePhase, setUpdatePhase] = useState<"idle" | "downloading" | "installing" | "restarting">("idle");
   const [serverCount, setServerCount] = useState(0);
   const [runningCount, setRunningCount] = useState(0);
   const [closeConfirm, setCloseConfirm] = useState<{ runningCount: number } | null>(null);
@@ -297,15 +299,38 @@ function AppContent() {
   const handleInstallUpdate = useCallback(async () => {
     if (!updateAvailable || downloading) return;
     setDownloading(true);
+    setUpdatePhase("downloading");
+    setUpdateProgress({ downloaded: 0, total: 0 });
     try {
       const upd = await check();
-      if (!upd) return;
-      await upd.downloadAndInstall((event) => {
-        if (event.event === "Finished") setDownloading(false);
+      if (!upd) {
+        setDownloading(false);
+        setUpdateProgress(null);
+        setUpdatePhase("idle");
+        return;
+      }
+      type DownloadEventData = { contentLength?: number; chunkLength?: number; content_length?: number; chunk_length?: number };
+      await upd.downloadAndInstall((event: { event: string; data?: DownloadEventData }) => {
+        const total = event.data?.contentLength ?? event.data?.content_length;
+        const chunk = event.data?.chunkLength ?? event.data?.chunk_length;
+        if (event.event === "Started" && total != null) {
+          setUpdateProgress((p) => ({ downloaded: p?.downloaded ?? 0, total }));
+        } else if (event.event === "Progress" && chunk != null) {
+          setUpdateProgress((p) =>
+            p ? { ...p, downloaded: p.downloaded + chunk } : { downloaded: chunk, total: 0 }
+          );
+        } else if (event.event === "Finished") {
+          setUpdatePhase("installing");
+          setUpdateProgress(null);
+        }
       });
+      setUpdatePhase("restarting");
+      setDownloading(false);
       await relaunch();
     } catch {
       setDownloading(false);
+      setUpdateProgress(null);
+      setUpdatePhase("idle");
     }
   }, [updateAvailable, downloading]);
 
@@ -383,25 +408,14 @@ function AppContent() {
       {updateAvailable && isTauri() && (
         <UpdateAvailableDialog
           open={showUpdateDialog}
-          onOpenChange={(open) => !open && setUpdateDialogDismissed(true)}
+          onOpenChange={(open) => !open && !downloading && setUpdateDialogDismissed(true)}
           update={updateAvailable}
           onInstall={handleInstallUpdate}
           onLater={() => setUpdateDialogDismissed(true)}
           isDownloading={downloading}
+          progress={updateProgress}
+          phase={updatePhase}
         />
-      )}
-      {updateAvailable && isTauri() && (
-        <div className="flex items-center justify-center gap-2 border-b border-emerald-500/30 bg-emerald-500/10 px-6 py-1.5 text-xs text-emerald-800 dark:text-emerald-300">
-          <span>{t("header.updateAvailable", { version: updateAvailable.version })}</span>
-          <button
-            type="button"
-            onClick={handleInstallUpdate}
-            disabled={downloading}
-            className="rounded-md border border-border bg-background px-2.5 py-1 text-xs hover:bg-accent transition-colors"
-          >
-            {downloading ? t("header.downloading") : t("header.install")}
-          </button>
-        </div>
       )}
 
       {testControlUrl && (

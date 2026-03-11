@@ -196,9 +196,17 @@
   },
   "updateDialog": {
     "title": "Update available",
-    "description": "iHostMC v{{version}} is available. Restart now to install the update?",
+    "description": "iHostMC v{{version}} is available. Update in-place—no separate installer.",
+    "updateNow": "Update now",
     "later": "Later",
-    "restartToUpdate": "Restart to update"
+    "restartToUpdate": "Restart to update",
+    "downloading": "Downloading update",
+    "downloadingDesc": "Downloading v{{version}}…",
+    "percent": "{{percent}}%",
+    "installing": "Installing",
+    "installingDesc": "Update downloaded. Installing…",
+    "restarting": "Restarting",
+    "restartingDesc": "Applying update. The app will reopen in a moment."
   },
   "devMenu": {
     "title": "Dev menu",
