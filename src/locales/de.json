@@ -80,7 +80,9 @@
     "installing": "Wird installiert",
     "installingDesc": "Update heruntergeladen. Installation läuft…",
     "restarting": "Wird neu gestartet",
-    "restartingDesc": "Update wird angewendet. Die App öffnet sich in Kürze wieder."
+    "restartingDesc": "Update wird angewendet. Die App öffnet sich in Kürze wieder.",
+    "errorTitle": "Update fehlgeschlagen",
+    "retry": "Erneut versuchen"
   },
   "devMenu": {
     "title": "Dev-Menü",

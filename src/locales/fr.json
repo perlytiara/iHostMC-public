@@ -122,7 +122,9 @@
     "installing": "Installation",
     "installingDesc": "Téléchargement terminé. Installation en cours…",
     "restarting": "Redémarrage",
-    "restartingDesc": "Application de la mise à jour. L’app va rouvrir dans un instant."
+    "restartingDesc": "Application de la mise à jour. L’app va rouvrir dans un instant.",
+    "errorTitle": "Échec de la mise à jour",
+    "retry": "Réessayer"
   },
   "devMenu": {
     "title": "Menu développeur",

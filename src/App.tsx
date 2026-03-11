@@ -162,7 +162,8 @@ function AppContent() {
   const [updateDialogDismissed, setUpdateDialogDismissed] = useState(false);
   const [downloading, setDownloading] = useState(false);
   const [updateProgress, setUpdateProgress] = useState<{ downloaded: number; total: number } | null>(null);
-  const [updatePhase, setUpdatePhase] = useState<"idle" | "downloading" | "installing" | "restarting">("idle");
+  const [updatePhase, setUpdatePhase] = useState<"idle" | "downloading" | "installing" | "restarting" | "error">("idle");
+  const [updateError, setUpdateError] = useState<string | null>(null);
   const [serverCount, setServerCount] = useState(0);
   const [runningCount, setRunningCount] = useState(0);
   const [closeConfirm, setCloseConfirm] = useState<{ runningCount: number } | null>(null);
@@ -298,6 +299,7 @@ function AppContent() {
 
   const handleInstallUpdate = useCallback(async () => {
     if (!updateAvailable || downloading) return;
+    setUpdateError(null);
     setDownloading(true);
     setUpdatePhase("downloading");
     setUpdateProgress({ downloaded: 0, total: 0 });
@@ -306,31 +308,44 @@ function AppContent() {
       if (!upd) {
         setDownloading(false);
         setUpdateProgress(null);
-        setUpdatePhase("idle");
+        setUpdatePhase("error");
+        setUpdateError("No update available. Please try again.");
         return;
       }
       type DownloadEventData = { contentLength?: number; chunkLength?: number; content_length?: number; chunk_length?: number };
-      await upd.downloadAndInstall((event: { event: string; data?: DownloadEventData }) => {
-        const total = event.data?.contentLength ?? event.data?.content_length;
-        const chunk = event.data?.chunkLength ?? event.data?.chunk_length;
-        if (event.event === "Started" && total != null) {
-          setUpdateProgress((p) => ({ downloaded: p?.downloaded ?? 0, total }));
-        } else if (event.event === "Progress" && chunk != null) {
-          setUpdateProgress((p) =>
-            p ? { ...p, downloaded: p.downloaded + chunk } : { downloaded: chunk, total: 0 }
-          );
-        } else if (event.event === "Finished") {
-          setUpdatePhase("installing");
-          setUpdateProgress(null);
+      const onProgress = (event: { event?: string; data?: DownloadEventData }) => {
+        try {
+          const ev = String((event as { event?: string })?.event ?? "").toLowerCase();
+          const data = event?.data;
+          const total = data?.contentLength ?? data?.content_length;
+          const chunk = data?.chunkLength ?? data?.chunk_length;
+          if ((ev === "started") && total != null) {
+            setUpdateProgress((p) => ({ downloaded: p?.downloaded ?? 0, total }));
+          } else if (ev === "progress" && chunk != null) {
+            setUpdateProgress((p) =>
+              p ? { ...p, downloaded: p.downloaded + chunk } : { downloaded: chunk, total: 0 }
+            );
+          } else if (ev === "finished") {
+            setUpdatePhase("installing");
+            setUpdateProgress(null);
+          }
+        } catch {
+          // ignore bad progress events
         }
-      });
-      setUpdatePhase("restarting");
+      };
+      await upd.download(onProgress);
       setDownloading(false);
+      setUpdatePhase("installing");
+      setUpdateProgress(null);
+      await upd.install();
+      setUpdatePhase("restarting");
       await relaunch();
-    } catch {
+    } catch (err) {
+      const message = err instanceof Error ? err.message : String(err);
+      setUpdateError(message || "Update failed. Try again or download from the website.");
       setDownloading(false);
       setUpdateProgress(null);
-      setUpdatePhase("idle");
+      setUpdatePhase("error");
     }
   }, [updateAvailable, downloading]);
 
@@ -415,6 +430,8 @@ function AppContent() {
           isDownloading={downloading}
           progress={updateProgress}
           phase={updatePhase}
+          error={updateError}
+          onRetry={() => { setUpdateError(null); setUpdatePhase("idle"); handleInstallUpdate(); }}
         />
       )}
 

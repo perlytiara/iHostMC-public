@@ -69,7 +69,7 @@ jobs:
           tag_name: ${{ startsWith(github.ref, 'refs/tags/') && github.ref_name || format('v{0}', steps.version.outputs.version) }}
           name: iHostMC ${{ startsWith(github.ref, 'refs/tags/') && github.ref_name || format('v{0}', steps.version.outputs.version) }}
           body: |
-            ## v0.5.5
+            ## v0.5.6
             - **Update experience (Discord-style):** Single embedded update modal with progress bar. Download and install in-app—no separate installer exe or yes/no popups. Clear phases: Downloading (with %), Installing, Restarting. Modal can’t be closed during update.
 
             Windows release. Install the setup exe or MSI.

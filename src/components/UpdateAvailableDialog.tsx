@@ -2,7 +2,7 @@
 
 import * as Dialog from "@radix-ui/react-dialog";
 import { useTranslation } from "react-i18next";
-import { Download, Loader2 } from "lucide-react";
+import { Download, Loader2, AlertCircle } from "lucide-react";
 import { Button } from "@/components/ui/button";
 import { cn } from "@/lib/utils";
 
@@ -11,7 +11,7 @@ export interface UpdateInfo {
   body: string | null;
 }
 
-export type UpdatePhase = "idle" | "downloading" | "installing" | "restarting";
+export type UpdatePhase = "idle" | "downloading" | "installing" | "restarting" | "error";
 
 interface UpdateAvailableDialogProps {
   open: boolean;
@@ -22,6 +22,8 @@ interface UpdateAvailableDialogProps {
   isDownloading: boolean;
   progress: { downloaded: number; total: number } | null;
   phase: UpdatePhase;
+  error: string | null;
+  onRetry: () => void;
 }
 
 export function UpdateAvailableDialog({
@@ -33,6 +35,8 @@ export function UpdateAvailableDialog({
   isDownloading,
   progress,
   phase,
+  error,
+  onRetry,
 }: UpdateAvailableDialogProps) {
   const { t } = useTranslation();
 
@@ -47,7 +51,7 @@ export function UpdateAvailableDialog({
       ? Math.min(100, Math.round((progress.downloaded / progress.total) * 100))
       : null;
 
-  const canClose = !isDownloading && phase === "idle";
+  const canClose = !isDownloading && (phase === "idle" || phase === "error");
 
   return (
     <Dialog.Root open={open} onOpenChange={(o) => canClose && onOpenChange(o)}>
@@ -68,8 +72,13 @@ export function UpdateAvailableDialog({
           onEscapeKeyDown={() => canClose && handleLater()}
         >
           <div className="flex flex-col items-center text-center">
-            <div className="mb-4 flex h-14 w-14 items-center justify-center rounded-full bg-primary/10">
-              {isDownloading || phase === "installing" || phase === "restarting" ? (
+            <div className={cn(
+              "mb-4 flex h-14 w-14 items-center justify-center rounded-full",
+              phase === "error" ? "bg-destructive/10" : "bg-primary/10"
+            )}>
+              {phase === "error" ? (
+                <AlertCircle className="h-7 w-7 text-destructive" />
+              ) : isDownloading || phase === "installing" || phase === "restarting" ? (
                 <Loader2 className="h-7 w-7 text-primary animate-spin" />
               ) : (
                 <Download className="h-7 w-7 text-primary" />
@@ -77,23 +86,29 @@ export function UpdateAvailableDialog({
             </div>
 
             <Dialog.Title className="text-xl font-semibold text-foreground">
-              {phase === "restarting"
-                ? t("updateDialog.restarting")
-                : phase === "installing"
-                  ? t("updateDialog.installing")
-                  : isDownloading
-                    ? t("updateDialog.downloading")
-                    : t("updateDialog.title")}
+              {phase === "error"
+                ? t("updateDialog.errorTitle")
+                : phase === "restarting"
+                  ? t("updateDialog.restarting")
+                  : phase === "installing"
+                    ? t("updateDialog.installing")
+                    : isDownloading
+                      ? t("updateDialog.downloading")
+                      : t("updateDialog.title")}
             </Dialog.Title>
 
             <Dialog.Description className="mt-2 text-sm text-muted-foreground">
-              {phase === "restarting"
-                ? t("updateDialog.restartingDesc")
-                : phase === "installing"
-                  ? t("updateDialog.installingDesc")
-                  : isDownloading
-                    ? t("updateDialog.downloadingDesc", { version: update.version })
-                    : t("updateDialog.description", { version: update.version })}
+              {phase === "error" && error ? (
+                <span className="block text-destructive">{error}</span>
+              ) : phase === "restarting" ? (
+                t("updateDialog.restartingDesc")
+              ) : phase === "installing" ? (
+                t("updateDialog.installingDesc")
+              ) : isDownloading ? (
+                t("updateDialog.downloadingDesc", { version: update.version })
+              ) : (
+                t("updateDialog.description", { version: update.version })
+              )}
             </Dialog.Description>
 
             {(isDownloading || phase === "installing" || phase === "restarting") && (
@@ -145,6 +160,22 @@ export function UpdateAvailableDialog({
                   </button>
                 </div>
               </>
+            )}
+
+            {phase === "error" && (
+              <div className="mt-6 flex w-full flex-col gap-3 sm:flex-row-reverse sm:justify-center">
+                <Button type="button" onClick={onRetry} className="gap-2 min-w-[120px]">
+                  <Download className="h-4 w-4" />
+                  {t("updateDialog.retry")}
+                </Button>
+                <button
+                  type="button"
+                  onClick={handleLater}
+                  className="text-sm text-muted-foreground underline-offset-4 hover:text-foreground hover:underline"
+                >
+                  {t("updateDialog.later")}
+                </button>
+              </div>
             )}
           </div>
         </Dialog.Content>

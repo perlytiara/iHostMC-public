@@ -206,7 +206,9 @@
     "installing": "Installing",
     "installingDesc": "Update downloaded. Installing…",
     "restarting": "Restarting",
-    "restartingDesc": "Applying update. The app will reopen in a moment."
+    "restartingDesc": "Applying update. The app will reopen in a moment.",
+    "errorTitle": "Update failed",
+    "retry": "Retry"
   },
   "devMenu": {
     "title": "Dev menu",
