@@ -1,11 +1,9 @@
 name: Build release
 
+# Only one build per release: run on tag push (e.g. v0.5.4) or manual trigger. No branch push.
 on:
   workflow_dispatch:
   push:
-    branches:
-      - main
-      - release
     tags:
       - "v*"
 
@@ -71,10 +69,8 @@ jobs:
           tag_name: ${{ startsWith(github.ref, 'refs/tags/') && github.ref_name || format('v{0}', steps.version.outputs.version) }}
           name: iHostMC ${{ startsWith(github.ref, 'refs/tags/') && github.ref_name || format('v{0}', steps.version.outputs.version) }}
           body: |
-            ## v0.5.3
-            - **Tutorial first:** Update popup only shows after onboarding is complete (no more invisible overlay blocking tutorial).
-            - **Developer settings:** Tab always visible; toggle "Show Developer menu" to enable the debug menu (☰ → Developer, Ctrl+Shift+D). Stripe/tier overrides still require backend override.
-            - **Root repo:** App is built only from iHostMC; iHost root no longer runs app build in Actions.
+            ## v0.5.4
+            - **DevTools now work in release builds:** Enable "Show Developer menu" in Settings → Developer, then use **F12**, the **Open DevTools** button in the Developer menu (☰ → Developer), or **Ctrl+Shift+Right-click** to open the web inspector.
 
             Windows release. Install the setup exe or MSI.
             **Share server** and in-app updates work with this build.

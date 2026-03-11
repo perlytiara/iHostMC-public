@@ -184,7 +184,7 @@ function AppContent() {
   }, []);
 
   useDevMenuShortcut(() => setDevMenuOpen(true), { enabled: developerMenuEnabled });
-  useInspectShortcut();
+  useInspectShortcut({ enabled: developerMenuEnabled });
   useDeepLinkAuth();
 
   // When any API returns 401, automatically clear auth so user sees connect screen and can re-sign in via browser

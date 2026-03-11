@@ -1211,18 +1211,10 @@ pub fn rename_server(id: String, new_name: String) -> Result<(), String> {
     server::rename_server(&id, &new_name)
 }
 
-/// Opens DevTools on the given window. No-op in release builds (dev-only).
+/// Opens DevTools on the given window. Available in all builds when user enables Developer menu.
 #[tauri::command]
 pub fn open_devtools(window: tauri::WebviewWindow) {
-    #[cfg(debug_assertions)]
-    {
-        let _ = window.open_devtools();
-    }
-    #[cfg(not(debug_assertions))]
-    {
-        // Release: devtools are not exposed; window is the target in debug builds.
-        drop(window);
-    }
+    let _ = window.open_devtools();
 }
 
 #[tauri::command]
