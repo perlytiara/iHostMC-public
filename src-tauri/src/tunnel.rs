@@ -291,6 +291,8 @@ async fn start_frp_blocking(
     let toml = format!(
         r#"# Stay alive and retry when frps restarts or connection drops
 loginFailExit = false
+# Send heartbeats often so server does not disconnect (server timeout is 180s)
+transport.heartbeatInterval = 20
 
 serverAddr = "{}"
 serverPort = {}
