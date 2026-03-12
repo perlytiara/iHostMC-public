@@ -2043,7 +2043,11 @@ dependencies = [
 
 [[package]]
 name = "ihostmc"
+<<<<<<< Updated upstream
 version = "0.5.5"
+=======
+version = "0.5.3"
+>>>>>>> Stashed changes
 dependencies = [
  "axum",
  "base64 0.22.1",

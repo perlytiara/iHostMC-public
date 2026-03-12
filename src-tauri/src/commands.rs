@@ -1436,7 +1436,10 @@ pub fn remove_upnp_if_active() {
 #[tauri::command]
 pub fn add_windows_firewall_rule(port: u16) -> Result<(), String> {
     #[cfg(not(target_os = "windows"))]
-    return Err("Firewall rules are only supported on Windows.".to_string());
+    return Err(format!(
+        "Firewall rules are only supported on Windows (requested port {}).",
+        port
+    ));
 
     #[cfg(target_os = "windows")]
     {
