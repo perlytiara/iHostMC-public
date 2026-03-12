@@ -9,6 +9,7 @@ on:
 
 jobs:
   build:
+    name: Build ${{ matrix.os == 'windows-latest' && 'Windows' || 'Linux' }}
     strategy:
       matrix:
         os:

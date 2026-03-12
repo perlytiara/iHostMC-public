@@ -1,0 +1,2 @@
+This placeholder file exists so the src-tauri/icons directory is created in the repository.
+The actual platform icon assets (including square PNGs for Linux/AppImage) must be added manually.
