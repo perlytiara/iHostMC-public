@@ -15,7 +15,6 @@ jobs:
           - windows-latest
           - ubuntu-22.04
     runs-on: ${{ matrix.os }}
->>>>>>> Stashed changes
 
     steps:
       - uses: actions/checkout@v4
