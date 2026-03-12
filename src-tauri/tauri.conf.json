@@ -29,12 +29,17 @@
     ]
   },
   "bundle": {
-  "active": true,
-  "targets": "all",
-  "icon": [
-  "icons/icon.ico"
-  ],
-  "windows": {
+    "active": true,
+    "targets": [
+      "nsis",
+      "msi",
+      "deb",
+      "rpm"
+    ],
+    "icon": [
+      "icons/icon.ico"
+    ],
+    "windows": {
       "webviewInstallMode": {
         "type": "offlineInstaller",
         "silent": true
@@ -45,13 +50,8 @@
         "sidebarImage": null,
         "installMode": "both"
       },
-  "wix": null
-  },
-  "linux": {
-  "appImage": {
-  "bundle": false
-  }
-  },
+      "wix": null
+    },
     "resources": [],
     "externalBin": [],
     "copyright": "",
