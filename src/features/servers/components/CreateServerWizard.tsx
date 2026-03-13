@@ -58,7 +58,7 @@ const SERVER_TYPES: { value: ServerType; label: string; desc: string; icon: type
   { value: "quilt", label: "Quilt", desc: "Fabric-compatible loader", icon: Package },
 ];
 
-const STEPS = ["wizard.nameType", "wizard.gameVersion", "wizard.memoryJava", "wizard.review"];
+const STEPS = ["wizard.nameTypeVersion", "wizard.memoryJava", "wizard.review"];
 
 /** Soft limit: above this count we show a hint before creating another server. */
 const SOFT_SERVER_LIMIT = 20;
@@ -69,9 +69,12 @@ const slideVariants = {
   exit: (dir: number) => ({ x: dir > 0 ? -40 : 40, opacity: 0 }),
 };
 
+const VALID_SERVER_TYPES: ServerType[] = ["vanilla", "paper", "purpur", "fabric", "forge", "neoforge", "quilt", "spigot", "bukkit"];
+
 interface CreateServerWizardProps {
   initialVersion?: string | null;
   initialName?: string | null;
+  initialServerType?: ServerType | null;
   initialMotd?: string | null;
   initialFaviconB64?: string | null;
   onCreated: (serverId: string) => void;
@@ -85,6 +88,7 @@ interface CreateServerWizardProps {
 export function CreateServerWizard({
   initialVersion,
   initialName,
+  initialServerType,
   initialMotd,
   initialFaviconB64,
   onCreated,
@@ -98,7 +102,9 @@ export function CreateServerWizard({
   const [name, setName] = useState(initialName?.trim() || "My Server");
   const [motd, setMotd] = useState(initialMotd?.trim() || "");
   const [faviconB64, _setFaviconB64] = useState<string | null>(initialFaviconB64 ?? null);
-  const [serverType, setServerType] = useState<ServerType>("paper");
+  const [serverType, setServerType] = useState<ServerType>(
+    initialServerType && VALID_SERVER_TYPES.includes(initialServerType) ? initialServerType : "paper"
+  );
   const [versions, setVersions] = useState<string[]>([]);
   const [version, setVersion] = useState(initialVersion || "");
   const [fabricLoaders, setFabricLoaders] = useState<string[]>([]);
@@ -181,9 +187,9 @@ export function CreateServerWizard({
     } finally { setLoading(false); }
   }, [serverType, t]);
 
-  useEffect(() => { if (step === 1) loadGameVersions(); }, [step, loadGameVersions]);
+  useEffect(() => { if (step === 0) loadGameVersions(); }, [step, loadGameVersions]);
   useEffect(() => {
-    if (step === 1 && version && (isFabric || isForge || isNeoForge) && versions.length > 0) loadModloaderForGame(version);
+    if (step === 0 && version && (isFabric || isForge || isNeoForge) && versions.length > 0) loadModloaderForGame(version);
   }, [step, version, isFabric, isForge, isNeoForge, versions.length, loadModloaderForGame]);
 
   // Cycle through phrases during server creation
@@ -453,9 +459,10 @@ export function CreateServerWizard({
       <div className="mx-auto w-full max-w-lg min-h-0 flex-1 flex flex-col overflow-hidden">
         <div className="overflow-y-auto overflow-x-hidden flex-1 min-h-0 py-1">
         <AnimatePresence mode="wait" custom={direction}>
+          {/* Step 0: Name + Type + Version in one screen */}
           {step === 0 && (
-            <motion.div key="step0" custom={direction} variants={slideVariants} initial="enter" animate="center" exit="exit" transition={{ duration: 0.2 }} className="space-y-3">
-              <h2 className="text-base font-bold">{t("wizard.createServer")}</h2>
+            <motion.div key="step0" custom={direction} variants={slideVariants} initial="enter" animate="center" exit="exit" transition={{ duration: 0.2 }} className="space-y-4">
+              <h2 className="text-base font-bold">{t("wizard.nameTypeVersion")}</h2>
               <div className="flex flex-col sm:flex-row gap-3 items-start">
                 <div className="space-y-1 flex-1 w-full">
                   <label className="text-xs font-medium text-muted-foreground">{t("wizard.name")}</label>
@@ -500,65 +507,47 @@ export function CreateServerWizard({
                   })}
                 </div>
               </div>
+              <div className="space-y-2 border-t border-border pt-3">
+                <label className="text-xs font-medium text-muted-foreground">{t("wizard.minecraftVersion")}</label>
+                {error && <p className="text-xs text-destructive rounded-lg bg-destructive/10 border border-destructive/30 px-2.5 py-1.5">{error}</p>}
+                {loading ? (
+                  <div className="flex items-center gap-2 py-2">
+                    <Loader2 className="h-4 w-4 animate-spin text-primary" />
+                    <span className="text-xs text-muted-foreground">{t("wizard.loadingVersions")}</span>
+                  </div>
+                ) : (
+                  <div className="space-y-2">
+                    <select className="w-full rounded-lg border border-input bg-background px-3 py-2 text-sm" value={version} onChange={(e) => setVersion(e.target.value)}>
+                      {versions.map((v, i) => <option key={v} value={v}>{v}{i === 0 ? ` ${t("wizard.latestLabel")}` : ""}</option>)}
+                    </select>
+                    {isForge && forgeBuilds.length > 0 && (
+                      <select className="w-full rounded-lg border border-input bg-background px-3 py-2 text-sm" value={forgeBuild} onChange={(e) => setForgeBuild(e.target.value)}>
+                        {forgeBuilds.map((b) => <option key={b.version} value={b.version}>{b.label}</option>)}
+                      </select>
+                    )}
+                    {isNeoForge && neoforgeVersions.length > 0 && (
+                      <select className="w-full rounded-lg border border-input bg-background px-3 py-2 text-sm" value={neoforgeVersion} onChange={(e) => setNeoforgeVersion(e.target.value)}>
+                        {neoforgeVersions.map((v) => <option key={v} value={v}>{v}</option>)}
+                      </select>
+                    )}
+                    {isFabric && fabricLoaders.length > 0 && (
+                      <select className="w-full rounded-lg border border-input bg-background px-3 py-2 text-sm" value={fabricLoader} onChange={(e) => setFabricLoader(e.target.value)}>
+                        {fabricLoaders.map((v) => <option key={v} value={v}>{v}</option>)}
+                      </select>
+                    )}
+                    {isFabric && fabricInstallers.length > 0 && (
+                      <select className="w-full rounded-lg border border-input bg-background px-3 py-2 text-sm" value={fabricInstaller} onChange={(e) => setFabricInstaller(e.target.value)}>
+                        {fabricInstallers.map((v) => <option key={v} value={v}>{v}</option>)}
+                      </select>
+                    )}
+                  </div>
+                )}
+              </div>
             </motion.div>
           )}
 
           {step === 1 && (
             <motion.div key="step1" custom={direction} variants={slideVariants} initial="enter" animate="center" exit="exit" transition={{ duration: 0.2 }} className="space-y-3">
-              <h2 className="text-base font-bold">{t("wizard.gameVersion")}</h2>
-              {error && <p className="text-xs text-destructive rounded-lg bg-destructive/10 border border-destructive/30 px-2.5 py-1.5">{error}</p>}
-              {loading ? (
-                <div className="flex flex-col items-center gap-2 py-4">
-                  <Loader2 className="h-6 w-6 animate-spin text-primary" />
-                  <span className="text-xs text-muted-foreground">{t("wizard.loadingVersions")}</span>
-                </div>
-              ) : (
-                <div className="space-y-2">
-                  <div className="space-y-1">
-                    <label className="text-xs font-medium text-muted-foreground">{t("wizard.minecraftVersion")}</label>
-                    <select className="w-full rounded-lg border border-input bg-background px-3 py-2 text-sm" value={version} onChange={(e) => setVersion(e.target.value)}>
-                      {versions.map((v, i) => <option key={v} value={v}>{v}{i === 0 ? ` ${t("wizard.latestLabel")}` : ""}</option>)}
-                    </select>
-                  </div>
-                  {isForge && forgeBuilds.length > 0 && (
-                    <div className="space-y-1">
-                      <label className="text-xs font-medium text-muted-foreground">Forge build</label>
-                      <select className="w-full rounded-lg border border-input bg-background px-3 py-2 text-sm" value={forgeBuild} onChange={(e) => setForgeBuild(e.target.value)}>
-                        {forgeBuilds.map((b) => <option key={b.version} value={b.version}>{b.label}</option>)}
-                      </select>
-                    </div>
-                  )}
-                  {isNeoForge && neoforgeVersions.length > 0 && (
-                    <div className="space-y-1">
-                      <label className="text-xs font-medium text-muted-foreground">NeoForge version</label>
-                      <select className="w-full rounded-lg border border-input bg-background px-3 py-2 text-sm" value={neoforgeVersion} onChange={(e) => setNeoforgeVersion(e.target.value)}>
-                        {neoforgeVersions.map((v) => <option key={v} value={v}>{v}</option>)}
-                      </select>
-                    </div>
-                  )}
-                  {isFabric && fabricLoaders.length > 0 && (
-                    <div className="space-y-1">
-                      <label className="text-xs font-medium text-muted-foreground">Fabric Loader</label>
-                      <select className="w-full rounded-lg border border-input bg-background px-3 py-2 text-sm" value={fabricLoader} onChange={(e) => setFabricLoader(e.target.value)}>
-                        {fabricLoaders.map((v) => <option key={v} value={v}>{v}</option>)}
-                      </select>
-                    </div>
-                  )}
-                  {isFabric && fabricInstallers.length > 0 && (
-                    <div className="space-y-1">
-                      <label className="text-xs font-medium text-muted-foreground">Fabric Installer</label>
-                      <select className="w-full rounded-lg border border-input bg-background px-3 py-2 text-sm" value={fabricInstaller} onChange={(e) => setFabricInstaller(e.target.value)}>
-                        {fabricInstallers.map((v) => <option key={v} value={v}>{v}</option>)}
-                      </select>
-                    </div>
-                  )}
-                </div>
-              )}
-            </motion.div>
-          )}
-
-          {step === 2 && (
-            <motion.div key="step2" custom={direction} variants={slideVariants} initial="enter" animate="center" exit="exit" transition={{ duration: 0.2 }} className="space-y-3">
               <h2 className="text-base font-bold">{t("wizard.memoryJava")}</h2>
               <div className="space-y-1.5">
                 <label className="text-xs font-medium text-muted-foreground flex items-center gap-1.5">
@@ -600,8 +589,8 @@ export function CreateServerWizard({
             </motion.div>
           )}
 
-          {step === 3 && (
-            <motion.div key="step3" custom={direction} variants={slideVariants} initial="enter" animate="center" exit="exit" transition={{ duration: 0.2 }} className="space-y-3">
+          {step === 2 && (
+            <motion.div key="step2" custom={direction} variants={slideVariants} initial="enter" animate="center" exit="exit" transition={{ duration: 0.2 }} className="space-y-3">
               <h2 className="text-base font-bold">{t("wizard.review")}</h2>
               <div className="rounded-lg border border-border bg-card p-3 space-y-1.5">
                 <ReviewRow icon={ServerIcon} label={t("wizard.name")} value={name} />
@@ -630,9 +619,9 @@ export function CreateServerWizard({
           )}
           <Button variant="ghost" onClick={onCancel}>{t("wizard.cancel")}</Button>
         </div>
-        {step < 3 ? (
+        {step < 2 ? (
           <Button
-            onClick={() => { if (step === 1) { goTo(2); loadRamAndJava(); } else goTo(step + 1); }}
+            onClick={() => { if (step === 0) { goTo(1); loadRamAndJava(); } else goTo(step + 1); }}
             disabled={loading}
             className="gap-1.5"
           >

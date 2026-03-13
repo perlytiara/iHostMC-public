@@ -769,6 +769,18 @@ pub fn set_run_in_background(run: bool) {
 }
 
 #[tauri::command]
+pub fn get_idle_slideshow() -> bool {
+    server::load_preferences().idle_slideshow
+}
+
+#[tauri::command]
+pub fn set_idle_slideshow(enabled: bool) {
+    let mut prefs = server::load_preferences();
+    prefs.idle_slideshow = enabled;
+    server::save_preferences(&prefs);
+}
+
+#[tauri::command]
 pub fn quit_app(app: AppHandle) {
     app.exit(0);
 }

@@ -143,12 +143,19 @@ jobs:
           body: |
             ## iHostMC v${{ steps.version.outputs.version }}
 
-            This release includes installers for:
+            Minecraft server host — create, run, and back up servers. In-app updates enabled for Windows.
 
-            - **Windows**: NSIS `.exe` and MSI `.msi` installers with in-app updates enabled.
-            - **Linux**: AppImage/Deb/RPM or tarball builds, depending on the current Tauri bundle configuration.
+            ### Downloads (assets below)
 
-            Assets are built from the `iHostMC` repository GitHub Actions workflow.
+            **Windows**
+            - **Installer (recommended):** [iHostMC_${{ steps.version.outputs.version }}_x64-setup.exe](https://github.com/perlytiara/iHostMC/releases/download/v${{ steps.version.outputs.version }}/iHostMC_${{ steps.version.outputs.version }}_x64-setup.exe) — NSIS installer, in-app updater
+            - **MSI:** `iHostMC_${{ steps.version.outputs.version }}_x64_en-US.msi` (in Assets below)
+
+            **Linux**
+            - `.deb`, `.rpm`, or tarball — see Assets below.
+
+            ### Updating
+            Open iHostMC → it will prompt when a new version is available, or download the latest installer from this release.
           draft: false
           files: |
             artifacts/windows/**

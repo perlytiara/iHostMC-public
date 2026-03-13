@@ -1,7 +1,7 @@
 {
   "name": "ihostmc",
   "private": false,
-  "version": "0.1.1",
+  "version": "0.1.2",
   "type": "module",
   "dependencies": {
     "@radix-ui/react-dialog": "^1.1.2",
@@ -57,10 +57,10 @@
     "ensure-env": "node scripts/ensure-env.cjs",
     "setup:gh": "node scripts/setup-github-actions.cjs",
     "sync-version": "node scripts/sync-version.cjs",
-    "dev": "node scripts/ensure-env.cjs && node scripts/sync-version.cjs && vite",
-    "build": "node scripts/ensure-env.cjs && node scripts/sync-version.cjs && vite build && node scripts/tauri-fix-dist-html.cjs",
+    "dev": "node scripts/ensure-env.cjs && node scripts/sync-version.cjs && npx vite",
+    "build": "node scripts/ensure-env.cjs && node scripts/sync-version.cjs && npx vite build && node scripts/tauri-fix-dist-html.cjs",
     "typecheck": "tsc -b",
-    "preview": "vite preview",
+    "preview": "npx vite preview",
     "tauri": "node scripts/tauri-wrapper.cjs",
     "tauri:test": "cross-env IHOSTMC_TEST=1 node scripts/tauri-wrapper.cjs dev",
     "build:public": "node scripts/ensure-env.cjs && node scripts/sync-version.cjs && cross-env VITE_API_BASE_URL=https://api.ihost.one VITE_WEBSITE_URL=https://ihost.one npm run build && node scripts/tauri-wrapper.cjs build",

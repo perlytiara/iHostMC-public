@@ -16,9 +16,7 @@ export interface OnboardingOverlayProps {
 
 const steps = [
   { titleKey: "onboarding.welcomeTitle", descKey: "onboarding.welcomeDesc" },
-  { titleKey: "onboarding.navTitle", descKey: "onboarding.navDesc" },
-  { titleKey: "onboarding.createTitle", descKey: "onboarding.createDesc" },
-  { titleKey: "onboarding.settingsTitle", descKey: "onboarding.settingsDesc" },
+  { titleKey: "onboarding.step2Title", descKey: "onboarding.step2Desc" },
   { titleKey: "onboarding.readyTitle", descKey: "onboarding.readyDesc" },
 ];
 
@@ -98,9 +96,9 @@ export function OnboardingOverlay({ completed = false, onComplete }: OnboardingO
 
               {step === steps.length - 1 && (
                 <motion.div
-                  initial={{ rotate: 0 }}
-                  animate={{ rotate: [0, -10, 10, -10, 0] }}
-                  transition={{ duration: 0.6, delay: 0.2 }}
+                  initial={{ scale: 0.9 }}
+                  animate={{ scale: 1 }}
+                  transition={{ type: "spring", stiffness: 300, damping: 20 }}
                   className="mb-4"
                 >
                   <Sparkles className="h-12 w-12 text-primary" />

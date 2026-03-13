@@ -47,9 +47,20 @@ import {
   ChevronDown,
   ChevronRight,
   Settings2,
+  Server,
+  Box,
+  Cpu,
+  Database,
+  Cloud,
+  Folder,
+  Zap,
+  Globe,
+  Home,
 } from "lucide-react";
+import type { LucideIcon } from "lucide-react";
 import { useCallback, useEffect, useRef, useState } from "react";
 import { createPortal } from "react-dom";
+import * as DropdownMenu from "@radix-ui/react-dropdown-menu";
 import { useTranslation } from "react-i18next";
 import { cn, isTauri } from "@/lib/utils";
 import { getFrpPrefs, getRelayTokenForTunnel } from "@/lib/tunnel-prefs";
@@ -74,13 +85,14 @@ import { SyncProgressPanel, type FileMetaMap } from "./SyncProgressPanel";
 import { SyncedFilesTree } from "./SyncedFilesTree";
 import { getWebsiteBackupsUrl, getBackupDetailUrl, getCloudServerUrl, api, getApiBaseUrl } from "@/lib/api-client";
 import { toast } from "@/lib/toast-store";
+import { getServerIcons, getServerIcon, setServerIcon, SERVER_ICON_IDS, type ServerIconId } from "@/lib/server-icons";
 import {
   getOutputLines,
   getRawBuffer,
   subscribeLines,
   clearServerOutput,
 } from "@/lib/server-output-store";
-import type { ServerConfig } from "../types";
+import type { ServerConfig, ServerType } from "../types";
 import type { MenuViewRequest, MenuBarServerContext } from "@/App";
 import type { SyncServerInfo } from "@/lib/api-client";
 
@@ -88,6 +100,73 @@ const MINECRAFT_DEFAULT_PORT = 25565;
 
 /** Show "many servers" banner above this count (same as CreateServerWizard soft limit). */
 const SOFT_SERVER_LIMIT = 20;
+
+const dropdownContentClass = "z-50 min-w-[220px] max-h-[70vh] overflow-y-auto rounded-xl border border-border bg-card p-1.5 text-foreground shadow-xl";
+const dropdownItemClass = "relative flex cursor-default select-none items-center gap-2 rounded-lg px-2.5 py-2 text-sm outline-none hover:bg-accent hover:text-accent-foreground data-[disabled]:pointer-events-none data-[disabled]:opacity-50 transition-colors";
+const dropdownLabelClass = "px-2.5 py-1.5 text-[10px] font-semibold uppercase tracking-wider text-muted-foreground";
+const ctxItemClass = "flex w-full items-center gap-2 px-3 py-1.5 text-left text-sm text-card-foreground hover:bg-accent hover:text-accent-foreground transition-colors disabled:opacity-50 disabled:pointer-events-none rounded-md";
+
+const SERVER_ICON_MAP: Record<ServerIconId, LucideIcon> = {
+  Server,
+  Gamepad2,
+  Cpu,
+  HardDrive,
+  Box,
+  LayoutDashboard,
+  Terminal,
+  Puzzle,
+  Database,
+  Cloud,
+  Folder,
+  Archive,
+  Zap,
+  Shield,
+  Globe,
+  Home,
+};
+
+function ServerIcon({ iconId, className }: { iconId: ServerIconId | null | undefined; className?: string }) {
+  const Icon = (iconId && SERVER_ICON_MAP[iconId]) ? SERVER_ICON_MAP[iconId] : Server;
+  return <Icon className={className} />;
+}
+
+/** Animated background that reflects server state: running = livelier motion and tint, stopped = calmer. */
+function StatefulBackground({ running }: { running: boolean }) {
+  return (
+    <div
+      className="pointer-events-none absolute inset-0 overflow-hidden"
+      aria-hidden
+    >
+      <style>{`
+        @keyframes state-bg-drift {
+          0%, 100% { background-position: 0% 0%; }
+          50% { background-position: 100% 100%; }
+        }
+      `}</style>
+      <div
+        className={cn(
+          "absolute inset-0 dark:opacity-[0.15]",
+          running ? "opacity-[0.1]" : "opacity-[0.06]"
+        )}
+        style={{
+          background: running
+            ? "radial-gradient(ellipse 120% 80% at 50% 20%, hsl(var(--primary)) 0%, transparent 50%), radial-gradient(ellipse 80% 120% at 80% 80%, hsl(142 76% 36%) 0%, transparent 45%)"
+            : "radial-gradient(ellipse 100% 100% at 30% 30%, hsl(var(--primary) / 0.8) 0%, transparent 50%), radial-gradient(ellipse 80% 80% at 70% 70%, hsl(var(--muted-foreground) / 0.3) 0%, transparent 50%)",
+          backgroundSize: "200% 200%",
+          animation: running ? "state-bg-drift 18s ease-in-out infinite" : "state-bg-drift 35s ease-in-out infinite",
+        }}
+      />
+      <div
+        className="absolute inset-0 opacity-[0.04]"
+        style={{
+          backgroundImage: "radial-gradient(circle at 20% 80%, hsl(var(--primary)) 0%, transparent 40%), radial-gradient(circle at 80% 20%, hsl(var(--primary)) 0%, transparent 40%)",
+          backgroundSize: "200% 200%",
+          animation: "state-bg-drift 25s ease-in-out infinite reverse",
+        }}
+      />
+    </div>
+  );
+}
 
 function formatPublicAddress(ip: string, port: number): string {
   return port === MINECRAFT_DEFAULT_PORT ? ip : `${ip}:${port}`;
@@ -118,9 +197,14 @@ export interface ServerListProps {
   onMenuViewRequestHandled?: () => void;
   runInBackground?: boolean;
   onRunInBackgroundChange?: (value: boolean) => void;
+  /** When true, server picker shows idle slideshow cycling servers (default from settings). */
+  idleSlideshow?: boolean;
+  onIdleSlideshowChange?: (value: boolean) => void;
   onMenuBarServerContextChange?: (ctx: MenuBarServerContext | null) => void;
   onServerCountChange?: (count: number) => void;
   onRunningCountChange?: (count: number) => void;
+  /** Main menu / app nav: e.g. go to Home */
+  onGoToHome?: () => void;
 }
 
 const sidebarItemVariants = {
@@ -134,19 +218,37 @@ export function ServerList({
   onMenuViewRequestHandled,
   runInBackground: runInBackgroundProp,
   onRunInBackgroundChange: _onRunInBackgroundChange,
+  idleSlideshow = true,
   onMenuBarServerContextChange,
   onServerCountChange,
   onRunningCountChange,
+  onGoToHome,
 }: ServerListProps = {}) {
   const { t } = useTranslation();
   const token = getToken();
   const { servers, loading: serversLoading, refresh } = useServers();
+  const [serverIconMap, setServerIconMap] = useState<Record<string, ServerIconId>>(() => {
+    try {
+      return getServerIcons();
+    } catch {
+      return {};
+    }
+  });
+  const [iconPickerForServerId, setIconPickerForServerId] = useState<string | null>(null);
+  const [slideshowActive, setSlideshowActive] = useState(false);
+  const [slideshowIndex, setSlideshowIndex] = useState(0);
+  const idleTimeoutRef = useRef<ReturnType<typeof setTimeout> | null>(null);
+  const slideshowIntervalRef = useRef<ReturnType<typeof setInterval> | null>(null);
   const { syncedServers, syncNow, syncing: metaSyncing, refreshSynced } = useSyncServers(servers, token, {
     autoSyncOnLoad: getAutoBackupEnabled(),
   });
   const activeServers = servers.filter((s) => !s.archived && !s.trashed_at);
   const archivedServers = servers.filter((s) => s.archived && !s.trashed_at);
   const trashedServers = servers.filter((s) => s.trashed_at);
+  /** Sync servers that exist on the website/cloud but have no local server on this device (e.g. from another device). */
+  const remoteOnlyServers = syncedServers.filter(
+    (s) => !s.trashedAt && !s.archived && !servers.some((l) => l.id === s.hostId)
+  );
   const [activeExpanded, setActiveExpanded] = useState(true);
   const [archiveExpanded, setArchiveExpanded] = useState(false);
   const [trashExpanded, setTrashExpanded] = useState(false);
@@ -167,6 +269,7 @@ export function ServerList({
     name: string;
     motd?: string;
     favicon_b64?: string | null;
+    server_type?: ServerType;
   } | null>(null);
   const runInBackground = runInBackgroundProp ?? false;
   const [publicIp, setPublicIp] = useState<string | null>(null);
@@ -442,6 +545,48 @@ export function ServerList({
     try { await invoke("open_server_folder", { serverId: id }); } catch (e) { if (import.meta.env.DEV) console.error(e); }
   }, []);
 
+  const IDLE_MS = 15000;
+  const SLIDESHOW_INTERVAL_MS = 5000;
+  useEffect(() => {
+    const on = centerView === "server" && !selectedId && idleSlideshow && activeServers.length > 0;
+    if (!on) {
+      if (idleTimeoutRef.current) { clearTimeout(idleTimeoutRef.current); idleTimeoutRef.current = null; }
+      setSlideshowActive(false);
+      return;
+    }
+    const schedule = () => {
+      if (idleTimeoutRef.current) clearTimeout(idleTimeoutRef.current);
+      idleTimeoutRef.current = setTimeout(() => {
+        idleTimeoutRef.current = null;
+        setSlideshowActive(true);
+        setSlideshowIndex(0);
+      }, IDLE_MS);
+    };
+    const reset = () => { setSlideshowActive(false); schedule(); };
+    schedule();
+    window.addEventListener("mousemove", reset);
+    window.addEventListener("keydown", reset);
+    window.addEventListener("click", reset);
+    window.addEventListener("scroll", reset, true);
+    return () => {
+      if (idleTimeoutRef.current) { clearTimeout(idleTimeoutRef.current); idleTimeoutRef.current = null; }
+      window.removeEventListener("mousemove", reset);
+      window.removeEventListener("keydown", reset);
+      window.removeEventListener("click", reset);
+      window.removeEventListener("scroll", reset, true);
+    };
+  }, [centerView, selectedId, idleSlideshow, activeServers.length]);
+
+  useEffect(() => {
+    if (!slideshowActive || activeServers.length === 0) return;
+    slideshowIntervalRef.current = setInterval(() => {
+      setSlideshowIndex((i) => (activeServers.length > 0 ? (i + 1) % activeServers.length : 0));
+    }, SLIDESHOW_INTERVAL_MS);
+    return () => {
+      if (slideshowIntervalRef.current) { clearInterval(slideshowIntervalRef.current); slideshowIntervalRef.current = null; }
+    };
+  }, [slideshowActive, activeServers.length]);
+
   useEffect(() => {
     if (!contextMenu) return;
     const close = () => setContextMenu(null);
@@ -500,6 +645,28 @@ export function ServerList({
     onMenuViewRequestHandled?.();
   }, [menuViewRequest, onMenuViewRequestHandled]);
 
+  // One-server focus: auto-select the only server and collapse sidebar so the main area is full-screen
+  useEffect(() => {
+    if (serversLoading || activeServers.length !== 1) return;
+    const only = activeServers[0];
+    setSelectedId(only.id);
+    setCenterView("server");
+    setTerminalTab("list");
+    setSidebarCollapsed(true);
+  }, [serversLoading, activeServers.length, activeServers[0]?.id]);
+
+  // No servers: once load finishes, show create so the user can build their one server (only on initial 0, so Import remains reachable)
+  const didAutoOpenCreateRef = useRef(false);
+  useEffect(() => {
+    if (serversLoading || activeServers.length > 0) {
+      if (activeServers.length > 0) didAutoOpenCreateRef.current = false;
+      return;
+    }
+    if (didAutoOpenCreateRef.current) return;
+    didAutoOpenCreateRef.current = true;
+    setCenterView("create");
+  }, [serversLoading, activeServers.length]);
+
   useEffect(() => {
     if (!onMenuBarServerContextChange) return;
     const selected = selectedId ? servers.find((s) => s.id === selectedId) : null;
@@ -514,7 +681,7 @@ export function ServerList({
   }, [onMenuBarServerContextChange, selectedId, runningId, servers, start, stop, openServerFolder]);
 
   const isRunning = runningId !== null;
-  const [sidebarCollapsed, setSidebarCollapsed] = useState(false);
+  const [sidebarCollapsed, setSidebarCollapsed] = useState(true);
 
   const sendServerCommand = useCallback((cmd: string) => {
     const line = cmd.endsWith("\n") ? cmd : `${cmd}\n`;
@@ -538,61 +705,108 @@ export function ServerList({
       {/* Sidebar */}
       <aside
         className={cn(
-          "flex flex-shrink-0 flex-col border-r border-border bg-card/50 transition-[width] duration-200",
+          "flex flex-shrink-0 flex-col min-h-0 border-r border-border bg-card/50 transition-[width] duration-200",
           sidebarCollapsed ? "w-14" : "w-60"
         )}
       >
-        <div className={cn("flex border-b border-border p-2", sidebarCollapsed ? "flex-col items-center gap-1" : "items-center justify-between px-3")}>
-          {sidebarCollapsed ? (
+        <div className={cn("flex flex-col min-h-0 shrink-0", sidebarCollapsed && "flex-1")}>
+          {/* Header row: same for collapsed/expanded */}
+          <div className={cn("flex shrink-0 border-b border-border p-2", sidebarCollapsed ? "flex-col items-center gap-1.5" : "items-center gap-1 px-2")}>
+            {sidebarCollapsed ? (
+              <>
+                <Button size="icon" variant="ghost" className="h-8 w-8 shrink-0 rounded-lg" onClick={() => { setSelectedId(null); setCenterView("server"); }} title={t("servers.viewAllServers", { defaultValue: "View all servers" })}>
+                  <LayoutDashboard className="h-4 w-4" />
+                </Button>
+                <Button size="icon" variant="ghost" className="h-8 w-8 shrink-0 rounded-lg" onClick={() => setSidebarCollapsed(false)} title={t("servers.openServerList", { defaultValue: "Open server list" })}>
+                  <PanelLeft className="h-4 w-4" />
+                </Button>
+                <div className="flex flex-col items-center gap-0.5">
+                  <Button size="icon" variant="ghost" className="h-7 w-7 shrink-0 rounded-md" onClick={async () => { refresh(); if (token && getApiBaseUrl()) await refreshSynced(); }} disabled={metaSyncing} title={t("servers.refreshList", { defaultValue: "Refresh" })}>
+                    {metaSyncing ? <Loader2 className="h-3.5 w-3.5 animate-spin" /> : <RefreshCw className="h-3.5 w-3.5" />}
+                  </Button>
+                  <Button size="icon" variant="ghost" className="h-7 w-7 shrink-0 rounded-md" onClick={() => { setCenterView("create"); setImportInitial(null); setCreateViewMinimized(false); }} title={t("servers.addServer")}>
+                    <Plus className="h-3.5 w-3.5" />
+                  </Button>
+                  <Button size="icon" variant="ghost" className="h-7 w-7 shrink-0 rounded-md" onClick={() => setCenterView("import")} title={t("menu.importServer")}>
+                    <Download className="h-3.5 w-3.5" />
+                  </Button>
+                </div>
+              </>
+            ) : (
             <>
-              <Button size="icon" variant="ghost" className="h-8 w-8" onClick={() => setSidebarCollapsed(false)}>
-                <PanelLeft className="h-4 w-4" />
+              <Button size="icon" variant="ghost" className="h-7 w-7 shrink-0 rounded-md" onClick={() => { setSelectedId(null); setCenterView("server"); }} title={t("servers.viewAllServers", { defaultValue: "View all servers" })}>
+                <LayoutDashboard className="h-3.5 w-3.5" />
               </Button>
-              <Button size="icon" variant="ghost" className="h-8 w-8" onClick={() => { setCenterView("create"); setImportInitial(null); setCreateViewMinimized(false); }}>
-                <Plus className="h-4 w-4" />
-              </Button>
-            </>
-          ) : (
-            <>
-              <span className="text-sm font-semibold">{t("servers.title")}</span>
-              <div className="flex items-center gap-0.5">
-                <Button size="icon" variant="ghost" className="h-8 w-8" onClick={async () => { refresh(); if (token && getApiBaseUrl()) await refreshSynced(); }} disabled={metaSyncing} title={t("servers.refreshList", { defaultValue: "Refresh" })}>
-                  {metaSyncing ? <Loader2 className="h-4 w-4 animate-spin" /> : <RefreshCw className="h-4 w-4" />}
+              <span className="text-sm font-semibold min-w-0 truncate flex-1">{t("servers.title")}</span>
+              <div className="flex items-center gap-0.5 opacity-70 hover:opacity-100 transition-opacity">
+                <Button size="icon" variant="ghost" className="h-7 w-7" onClick={async () => { refresh(); if (token && getApiBaseUrl()) await refreshSynced(); }} disabled={metaSyncing} title={t("servers.refreshList", { defaultValue: "Refresh" })}>
+                  {metaSyncing ? <Loader2 className="h-3.5 w-3.5 animate-spin" /> : <RefreshCw className="h-3.5 w-3.5" />}
                 </Button>
-                <Button size="icon" variant="ghost" className="h-8 w-8" onClick={() => setSidebarCollapsed(true)}>
-                  <PanelLeftClose className="h-4 w-4" />
+                <Button size="icon" variant="ghost" className="h-7 w-7" onClick={() => { setCenterView("create"); setImportInitial(null); setCreateViewMinimized(false); }} title={t("servers.addServer")}>
+                  <Plus className="h-3.5 w-3.5" />
                 </Button>
-                <Button size="icon" variant="ghost" className="h-8 w-8" onClick={() => { setCenterView("create"); setImportInitial(null); setCreateViewMinimized(false); }}>
-                  <Plus className="h-4 w-4" />
-                </Button>
-                <Button size="icon" variant="ghost" className="h-8 w-8" onClick={() => { setCenterView("import"); setImportInitial(null); }}>
-                  <Download className="h-4 w-4" />
+                <Button size="icon" variant="ghost" className="h-7 w-7" onClick={() => { setCenterView("import"); setImportInitial(null); }} title={t("menu.importServer")}>
+                  <Download className="h-3.5 w-3.5" />
                 </Button>
               </div>
+              <Button size="icon" variant="ghost" className="h-8 w-8 shrink-0 rounded-lg border-l border-border/60 ml-0.5 pl-1.5" onClick={() => setSidebarCollapsed(true)} title={t("servers.collapseSidebar", { defaultValue: "Collapse sidebar" })}>
+                <PanelLeftClose className="h-4 w-4" />
+              </Button>
             </>
+          )}
+          </div>
+          {/* Collapsed: server list right below the header actions */}
+          {sidebarCollapsed && (
+            <div className="flex flex-1 flex-col min-h-0 border-t border-border pt-1.5">
+              <p className="text-[10px] font-medium text-muted-foreground text-center px-1 mb-1" aria-hidden>{t("servers.title")}</p>
+              <div className="flex flex-1 flex-col items-center gap-1 min-h-0 overflow-y-auto overflow-x-hidden">
+                {activeServers.map((s) => {
+                    const iconId = serverIconMap[s.id] ?? null;
+                    const isSelected = selectedId === s.id;
+                    const isRunning = runningId === s.id;
+                    return (
+                      <button
+                        key={s.id}
+                        type="button"
+                        className={cn(
+                          "flex h-9 w-9 shrink-0 items-center justify-center rounded-lg border transition-colors",
+                          isSelected ? "border-primary bg-primary/15 text-primary" : "border-transparent bg-muted/40 hover:bg-muted/70 text-muted-foreground hover:text-foreground",
+                          isRunning && "ring-1 ring-green-500/50"
+                        )}
+                        onClick={() => { setSelectedId(s.id); setCenterView("server"); setTerminalTab("list"); }}
+                        onContextMenu={(e) => { e.preventDefault(); setContextMenu({ x: e.clientX, y: e.clientY, server: s }); }}
+                        data-context-menu="server"
+                        title={s.name}
+                      >
+                        <ServerIcon iconId={iconId} className="h-4 w-4" />
+                      </button>
+                    );
+                  })}
+              </div>
+            </div>
           )}
         </div>
         {!sidebarCollapsed && (
-          <>
+          <div className="flex flex-1 flex-col min-h-0 min-w-0">
             {activeServers.length >= SOFT_SERVER_LIMIT && (
-              <div className="shrink-0 border-b border-amber-500/30 bg-amber-500/10 px-3 py-2 text-xs text-amber-700 dark:text-amber-400">
+              <div className="shrink-0 border-b border-amber-500/30 bg-amber-500/10 px-2 py-1.5 text-xs text-amber-700 dark:text-amber-400">
                 {t("servers.manyServersBanner", { count: activeServers.length })}
               </div>
             )}
-            <div className="flex-1 min-h-0 overflow-y-auto flex flex-col p-2">
+            <div className="flex-1 min-h-0 overflow-y-auto flex flex-col p-1.5">
               {serversLoading ? (
-                <div className="flex flex-col items-center justify-center gap-2 py-8">
-                  <Loader2 className="h-6 w-6 animate-spin text-muted-foreground" />
+                <div className="flex flex-col items-center justify-center gap-2 py-6">
+                  <Loader2 className="h-5 w-5 animate-spin text-muted-foreground" />
                   <span className="text-xs text-muted-foreground">{t("servers.loading")}</span>
                 </div>
               ) : activeServers.length === 0 && archivedServers.length === 0 && trashedServers.length === 0 ? (
-                <div className="flex flex-col items-center gap-2 py-8 text-center">
-                  <Gamepad2 className="h-8 w-8 text-muted-foreground/50" />
+                <div className="flex flex-col items-center gap-2 py-6 text-center">
+                  <Gamepad2 className="h-7 w-7 text-muted-foreground/50" />
                   <p className="text-xs text-muted-foreground">{t("servers.selectOrCreate")}</p>
                 </div>
               ) : (
                 <>
-                <div className="flex w-full items-center gap-1 rounded-lg px-2 py-1.5 text-xs font-medium text-muted-foreground">
+                <div className="flex w-full items-center gap-1 rounded-md px-1.5 py-1 text-xs font-medium text-muted-foreground">
                   <button
                     type="button"
                     onClick={() => setActiveExpanded((e) => !e)}
@@ -604,7 +818,7 @@ export function ServerList({
                 </div>
                 {activeExpanded && (
                 <AnimatePresence>
-                  <ul className="mt-1 space-y-2">
+                  <ul className="mt-1 space-y-1">
                     {creatingServer.creating && (
                       <motion.li
                         variants={sidebarItemVariants}
@@ -649,6 +863,7 @@ export function ServerList({
                           : syncedRec.miniSynced
                             ? "mini"
                             : "registered";
+                      const syncLabel = cloudState === "none" ? t("servers.notSynced") : cloudState === "saved" ? t("servers.syncedToWebsite") : cloudState === "mini" ? t("servers.miniSyncedHint") : t("servers.registeredToCloud");
                       return (
                       <motion.li
                         key={s.id}
@@ -659,7 +874,7 @@ export function ServerList({
                         transition={{ delay: i * 0.04 }}
                         data-context-menu="server"
                         className={cn(
-                          "group flex items-center justify-between gap-2 rounded-lg border border-border bg-card px-2.5 py-2 text-sm transition-colors cursor-pointer shadow-sm",
+                          "group relative flex items-center justify-between gap-1.5 rounded-lg border border-border bg-card px-2 py-1.5 text-sm transition-colors cursor-pointer shadow-sm",
                           centerView === "server" && selectedId === s.id
                             ? "bg-accent border-accent-foreground/20 text-accent-foreground"
                             : "hover:bg-accent/50 hover:border-border/80"
@@ -667,6 +882,7 @@ export function ServerList({
                         onContextMenu={(e: React.MouseEvent) => {
                           if (e.ctrlKey && e.shiftKey) return;
                           e.preventDefault();
+                          e.stopPropagation();
                           setContextMenu({ x: e.clientX, y: e.clientY, server: s });
                         }}
                         onClick={() => {
@@ -676,7 +892,17 @@ export function ServerList({
                           if (creatingServer.creating) setCreateViewMinimized(true);
                         }}
                       >
+                        {/* Hover tooltip: name + type/version + sync (XMCL-style), above row so not clipped */}
+                        <div className="absolute bottom-full left-0 mb-1 z-50 hidden group-hover:block w-52 rounded-lg border border-border bg-card px-2.5 py-2 text-left shadow-lg pointer-events-none">
+                          <p className="font-semibold text-foreground truncate">{s.name}</p>
+                          <p className="text-[11px] text-muted-foreground mt-0.5">{s.server_type} · {s.minecraft_version}</p>
+                          <p className="text-[10px] text-muted-foreground/90 mt-0.5 flex items-center gap-1">
+                            {cloudState === "none" ? <CloudOff className="h-3 w-3 shrink-0" /> : <Cloudy className="h-3 w-3 shrink-0" />}
+                            {syncLabel}
+                          </p>
+                        </div>
                         <div className="min-w-0 flex-1 flex items-center gap-1.5">
+                          <ServerIcon iconId={serverIconMap[s.id] ?? null} className="h-4 w-4 shrink-0 text-muted-foreground group-hover:text-foreground" />
                         {editingServerId === s.id ? (
                           <input
                             ref={editingServerId === s.id ? editInputRef : undefined}
@@ -804,6 +1030,7 @@ export function ServerList({
                         )}
                         onContextMenu={(e: React.MouseEvent) => {
                           e.preventDefault();
+                          e.stopPropagation();
                           setContextMenu({ x: e.clientX, y: e.clientY, server: s });
                         }}
                         onClick={() => {
@@ -903,7 +1130,7 @@ export function ServerList({
                   )}
                 </div>
               )}
-          </>
+          </div>
         )}
       </aside>
 
@@ -912,61 +1139,127 @@ export function ServerList({
         createPortal(
           <div
             ref={contextMenuRef}
-            className="fixed z-50 min-w-[180px] rounded-lg border border-border bg-card text-card-foreground py-1 shadow-xl backdrop-blur-sm"
+            className="fixed z-50 min-w-[200px] rounded-xl border border-border bg-card text-card-foreground py-1.5 shadow-xl backdrop-blur-sm"
             style={{ left: contextMenu.x, top: contextMenu.y }}
           >
             {contextMenu.server.trashed_at ? (
               <>
-                <button type="button" className="flex w-full items-center gap-2 px-3 py-1.5 text-left text-sm text-card-foreground hover:bg-accent hover:text-accent-foreground transition-colors" onClick={() => { openServerFolder(contextMenu.server.id); setContextMenu(null); }}>
+                <button type="button" className={ctxItemClass} onClick={() => { openServerFolder(contextMenu.server.id); setContextMenu(null); }}>
                   <FolderOpen className="h-3.5 w-3.5 shrink-0" /> {t("servers.contextOpenFolder")}
                 </button>
                 <div className="my-1 border-t border-border" />
-                <button type="button" className="flex w-full items-center gap-2 px-3 py-1.5 text-left text-sm text-primary hover:bg-accent hover:text-accent-foreground transition-colors disabled:opacity-50" disabled={isDeleting} onClick={() => { requestRestoreServer(contextMenu.server); setContextMenu(null); }}>
+                <button type="button" className={cn(ctxItemClass, "text-primary")} disabled={isDeleting} onClick={() => { requestRestoreServer(contextMenu.server); setContextMenu(null); }}>
                   <RotateCcw className="h-3.5 w-3.5 shrink-0" /> {t("servers.contextRestore")}
                 </button>
-                <button type="button" className="flex w-full items-center gap-2 px-3 py-1.5 text-left text-sm text-destructive hover:bg-destructive/10 hover:text-destructive transition-colors disabled:opacity-50" disabled={isDeleting} onClick={() => { requestDeleteServer(contextMenu.server); setContextMenu(null); }}>
-                  <Trash2 className="h-3.5 w-3.5 shrink-0" /> {t("servers.permanentDeleteConfirmButton")}
+                <button type="button" className={cn(ctxItemClass, "text-destructive hover:bg-destructive/10")} disabled={isDeleting} onClick={() => { requestDeleteServer(contextMenu.server); setContextMenu(null); }}>
+                  <Trash2 className="h-3.5 w-3.5 shrink-0" /> {t("servers.contextDeletePermanently", { defaultValue: "Delete permanently" })}
                 </button>
               </>
             ) : contextMenu.server.archived ? (
               <>
-                <button type="button" className="flex w-full items-center gap-2 px-3 py-1.5 text-left text-sm text-card-foreground hover:bg-accent hover:text-accent-foreground transition-colors" onClick={() => { openServerFolder(contextMenu.server.id); setContextMenu(null); }}>
+                <button type="button" className={ctxItemClass} onClick={() => { openServerFolder(contextMenu.server.id); setContextMenu(null); }}>
                   <FolderOpen className="h-3.5 w-3.5 shrink-0" /> {t("servers.contextOpenFolder")}
                 </button>
                 <div className="my-1 border-t border-border" />
-                <button type="button" className="flex w-full items-center gap-2 px-3 py-1.5 text-left text-sm text-primary hover:bg-accent hover:text-accent-foreground transition-colors disabled:opacity-50" disabled={isDeleting} onClick={() => { requestUnarchiveServer(contextMenu.server); setContextMenu(null); }}>
-                  <ArchiveRestore className="h-3.5 w-3.5 shrink-0" /> {t("servers.contextUnarchive")}
+                <button type="button" className={cn(ctxItemClass, "text-primary")} disabled={isDeleting} onClick={() => { requestUnarchiveServer(contextMenu.server); setContextMenu(null); }}>
+                  <ArchiveRestore className="h-3.5 w-3.5 shrink-0" /> {t("servers.contextRestoreToList", { defaultValue: "Restore to list" })}
                 </button>
-                <button type="button" className="flex w-full items-center gap-2 px-3 py-1.5 text-left text-sm text-destructive hover:bg-destructive/10 hover:text-destructive transition-colors disabled:opacity-50" disabled={isDeleting} onClick={() => requestDeleteServer(contextMenu.server)}>
+                <button type="button" className={cn(ctxItemClass, "text-destructive hover:bg-destructive/10")} disabled={isDeleting} onClick={() => requestDeleteServer(contextMenu.server)}>
                   <Trash2 className="h-3.5 w-3.5 shrink-0" /> {t("servers.contextMoveToTrash")}
                 </button>
               </>
             ) : (
               <>
-                <button type="button" className="flex w-full items-center gap-2 px-3 py-1.5 text-left text-sm text-card-foreground hover:bg-accent hover:text-accent-foreground transition-colors" onClick={() => { openServerFolder(contextMenu.server.id); setContextMenu(null); }}>
+                <div className="px-2.5 py-1 text-[10px] font-semibold uppercase tracking-wider text-muted-foreground">{t("servers.contextView", { defaultValue: "View" })}</div>
+                <button type="button" className={ctxItemClass} onClick={() => { setSelectedId(contextMenu.server.id); setCenterView("server"); setTerminalTab("list"); setContextMenu(null); }}>
+                  <Info className="h-3.5 w-3.5 shrink-0" /> {t("servers.contextOpenOverview", { defaultValue: "Open overview" })}
+                </button>
+                <button type="button" className={ctxItemClass} onClick={() => { openServerFolder(contextMenu.server.id); setContextMenu(null); }}>
                   <FolderOpen className="h-3.5 w-3.5 shrink-0" /> {t("servers.contextOpenFolder")}
                 </button>
-                <button type="button" className="flex w-full items-center gap-2 px-3 py-1.5 text-left text-sm text-card-foreground hover:bg-accent hover:text-accent-foreground transition-colors" onClick={() => { setEditingServerId(contextMenu.server.id); setContextMenu(null); }}>
+                <button type="button" className={ctxItemClass} onClick={() => { setSelectedId(contextMenu.server.id); setCenterView("server"); setTerminalTab("backup"); setContextMenu(null); }}>
+                  <CloudUpload className="h-3.5 w-3.5 shrink-0" /> {t("servers.contextCloudBackup", { defaultValue: "Cloud backup & sync" })}
+                </button>
+                <div className="my-1 border-t border-border" />
+                <div className="px-2.5 py-1 text-[10px] font-semibold uppercase tracking-wider text-muted-foreground">{t("servers.contextEdit", { defaultValue: "Edit" })}</div>
+                <button type="button" className={ctxItemClass} onClick={() => { setEditingServerId(contextMenu.server.id); setContextMenu(null); }}>
                   <Pencil className="h-3.5 w-3.5 shrink-0" /> {t("servers.contextRename")}
                 </button>
+                <button type="button" className={ctxItemClass} onClick={() => { setIconPickerForServerId(contextMenu.server.id); setContextMenu(null); }}>
+                  <LayoutDashboard className="h-3.5 w-3.5 shrink-0" /> {t("servers.contextSetIcon", { defaultValue: "Set icon" })}
+                </button>
+                <div className="my-1 border-t border-border" />
                 {runningId === contextMenu.server.id ? (
-                  <button type="button" className="flex w-full items-center gap-2 px-3 py-1.5 text-left text-sm text-card-foreground hover:bg-accent hover:text-accent-foreground transition-colors" onClick={() => { stop(); setContextMenu(null); }}>
+                  <button type="button" className={ctxItemClass} onClick={() => { stop(); setContextMenu(null); }}>
                     <Square className="h-3.5 w-3.5 shrink-0" /> {t("servers.contextStop")}
                   </button>
                 ) : (
-                  <button type="button" className="flex w-full items-center gap-2 px-3 py-1.5 text-left text-sm text-card-foreground hover:bg-accent hover:text-accent-foreground transition-colors disabled:opacity-50" disabled={isRunning} onClick={() => { start(contextMenu.server); setContextMenu(null); }}>
+                  <button type="button" className={ctxItemClass} disabled={isRunning} onClick={() => { start(contextMenu.server); setContextMenu(null); }}>
                     <Play className="h-3.5 w-3.5 shrink-0" /> {t("servers.contextStart")}
                   </button>
                 )}
                 <div className="my-1 border-t border-border" />
-                <button type="button" className="flex w-full items-center gap-2 px-3 py-1.5 text-left text-sm text-card-foreground hover:bg-accent hover:text-accent-foreground transition-colors disabled:opacity-50" disabled={runningId === contextMenu.server.id} onClick={() => { requestArchiveServer(contextMenu.server); setContextMenu(null); }}>
+                <div className="px-2.5 py-1 text-[10px] font-semibold uppercase tracking-wider text-muted-foreground">{t("servers.contextOrganize", { defaultValue: "Organize" })}</div>
+                <button type="button" className={ctxItemClass} disabled={runningId === contextMenu.server.id} onClick={() => { requestArchiveServer(contextMenu.server); setContextMenu(null); }}>
                   <Archive className="h-3.5 w-3.5 shrink-0" /> {t("servers.contextArchive")}
                 </button>
-                <button type="button" className="flex w-full items-center gap-2 px-3 py-1.5 text-left text-sm text-destructive hover:bg-destructive/10 hover:text-destructive transition-colors disabled:opacity-50" disabled={runningId === contextMenu.server.id} onClick={() => requestDeleteServer(contextMenu.server)}>
+                <button type="button" className={cn(ctxItemClass, "text-destructive hover:bg-destructive/10")} disabled={runningId === contextMenu.server.id} onClick={() => requestDeleteServer(contextMenu.server)}>
                   <Trash2 className="h-3.5 w-3.5 shrink-0" /> {t("servers.contextMoveToTrash")}
                 </button>
               </>
             )}
+          </div>,
+          document.body
+        )}
+
+      {/* Icon picker for server */}
+      {iconPickerForServerId &&
+        createPortal(
+          <div
+            className="fixed inset-0 z-[100] flex items-center justify-center bg-black/50 backdrop-blur-sm p-4"
+            onClick={() => setIconPickerForServerId(null)}
+            role="dialog"
+            aria-modal="true"
+            aria-label={t("servers.setServerIcon", { defaultValue: "Set server icon" })}
+          >
+            <motion.div
+              initial={{ opacity: 0, scale: 0.95 }}
+              animate={{ opacity: 1, scale: 1 }}
+              className="rounded-2xl border border-border bg-card p-4 shadow-xl max-w-sm w-full"
+              onClick={(e) => e.stopPropagation()}
+            >
+              <p className="text-sm font-medium text-foreground mb-3">{t("servers.setServerIcon", { defaultValue: "Set server icon" })}</p>
+              <div className="grid grid-cols-4 gap-2">
+                {SERVER_ICON_IDS.map((iconId) => {
+                  const Icon = SERVER_ICON_MAP[iconId];
+                  const isSelected = (serverIconMap[iconPickerForServerId] ?? null) === iconId;
+                  return (
+                    <button
+                      key={iconId}
+                      type="button"
+                      className={cn(
+                        "flex items-center justify-center h-10 w-10 rounded-xl border-2 transition-colors",
+                        isSelected ? "border-primary bg-primary/10 text-primary" : "border-border bg-muted/30 hover:bg-muted/60 text-muted-foreground hover:text-foreground"
+                      )}
+                      onClick={() => {
+                        setServerIcon(iconPickerForServerId, iconId);
+                        setServerIconMap(getServerIcons());
+                        setIconPickerForServerId(null);
+                        toast.success(t("servers.iconSet", { defaultValue: "Icon set" }));
+                      }}
+                      title={iconId}
+                    >
+                      <Icon className="h-5 w-5" />
+                    </button>
+                  );
+                })}
+              </div>
+              <div className="mt-3 flex justify-end">
+                <Button variant="ghost" size="sm" onClick={() => setIconPickerForServerId(null)}>
+                  {t("common.cancel", { defaultValue: "Cancel" })}
+                </Button>
+              </div>
+            </motion.div>
           </div>,
           document.body
         )}
@@ -1053,6 +1346,7 @@ export function ServerList({
 
       {/* Main content */}
       <main className="relative flex flex-1 flex-col min-w-0 overflow-hidden bg-background">
+        {centerView === "server" && <StatefulBackground running={!!runningId} />}
         {/* Create view: show when create is selected; keep mounted (hidden) when creating but user switched to another server so "Creating…" sidebar click returns to live progress */}
         {(centerView === "create" || creatingServer.creating) && (
           <div
@@ -1092,6 +1386,7 @@ export function ServerList({
               <CreateServerWizard
                 initialVersion={importInitial?.version}
                 initialName={importInitial?.name}
+                initialServerType={importInitial?.server_type}
                 initialMotd={importInitial?.motd}
                 initialFaviconB64={importInitial?.favicon_b64}
                 onCreated={async (serverId) => {
@@ -1143,6 +1438,84 @@ export function ServerList({
           <>
             {selectedId ? (
               <>
+                {/* Server bar: server dropdown only (no second top bar icons) */}
+                <div className="flex items-center border-b border-border/60 px-3 py-2 bg-muted/15">
+                  <DropdownMenu.Root>
+                    <DropdownMenu.Trigger asChild>
+                      <button
+                        type="button"
+                        className="flex flex-1 min-w-0 items-center gap-2 rounded-xl border border-border bg-card px-3 py-2 text-left shadow-sm hover:bg-accent/40 transition-colors"
+                      >
+                        <Server className="h-4 w-4 shrink-0 text-primary" />
+                        <span className="truncate font-semibold text-sm text-foreground">
+                          {servers.find((x) => x.id === selectedId)?.name ?? t("servers.title")}
+                        </span>
+                        <ChevronDown className="h-3.5 w-3.5 shrink-0 text-muted-foreground" />
+                      </button>
+                    </DropdownMenu.Trigger>
+                    <DropdownMenu.Portal>
+                      <DropdownMenu.Content className={dropdownContentClass} align="start" sideOffset={6}>
+                        {activeServers.map((s) => (
+                          <DropdownMenu.Item
+                            key={s.id}
+                            className={dropdownItemClass}
+                            onSelect={() => { setSelectedId(s.id); setCenterView("server"); setTerminalTab("list"); }}
+                          >
+                            {runningId === s.id ? <span className="h-2 w-2 rounded-full bg-green-500 animate-pulse shrink-0" /> : <span className="w-2 shrink-0" />}
+                            <span className="truncate">{s.name}</span>
+                          </DropdownMenu.Item>
+                        ))}
+                        {archivedServers.length > 0 && (
+                          <>
+                            <DropdownMenu.Separator className="my-1.5" />
+                            <div className={dropdownLabelClass}>{t("servers.hidden")}</div>
+                            {archivedServers.map((s) => (
+                              <DropdownMenu.Item
+                                key={s.id}
+                                className={dropdownItemClass}
+                                onSelect={() => { setSelectedId(s.id); setCenterView("server"); setTerminalTab("list"); }}
+                              >
+                                <Archive className="h-3.5 w-3.5 shrink-0 text-muted-foreground" />
+                                <span className="truncate">{s.name}</span>
+                              </DropdownMenu.Item>
+                            ))}
+                          </>
+                        )}
+                        {trashedServers.length > 0 && (
+                          <>
+                            <DropdownMenu.Separator className="my-1.5" />
+                            <div className={dropdownLabelClass}>{t("servers.trashSection")}</div>
+                            {trashedServers.map((s) => (
+                              <DropdownMenu.Item
+                                key={s.id}
+                                className={cn(dropdownItemClass, "opacity-75")}
+                                onSelect={() => { setSelectedId(s.id); setCenterView("server"); setTerminalTab("list"); }}
+                              >
+                                <Trash2 className="h-3.5 w-3.5 shrink-0 text-muted-foreground" />
+                                <span className="truncate">{s.name}</span>
+                              </DropdownMenu.Item>
+                            ))}
+                          </>
+                        )}
+                        <DropdownMenu.Separator className="my-1.5" />
+                        <DropdownMenu.Item
+                          className={dropdownItemClass}
+                          onSelect={() => { setCenterView("create"); setImportInitial(null); setCreateViewMinimized(false); }}
+                        >
+                          <Plus className="h-3.5 w-3.5 shrink-0" />
+                          {t("servers.addServer")}
+                        </DropdownMenu.Item>
+                        <DropdownMenu.Item
+                          className={dropdownItemClass}
+                          onSelect={() => setCenterView("import")}
+                        >
+                          <Download className="h-3.5 w-3.5 shrink-0" />
+                          {t("menu.importServer")}
+                        </DropdownMenu.Item>
+                      </DropdownMenu.Content>
+                    </DropdownMenu.Portal>
+                  </DropdownMenu.Root>
+                </div>
                 {/* Tab bar: Summary, Cloud, Console, Mods, Plugins | Files */}
                 <div className="flex items-center gap-0 border-b border-border px-4 py-1.5">
                   {tabItems.map((tab) => {
@@ -1291,18 +1664,186 @@ export function ServerList({
                 </div>
               </>
             ) : (
-              /* No server selected – empty state only, no tabs */
-              <div className="flex flex-1 flex-col items-center justify-center gap-3 py-16 text-muted-foreground">
+              /* No server selected – no top bar, just the picker view */
+              <div className="relative flex flex-1 flex-col min-h-0 overflow-auto">
                 {serversLoading ? (
-                  <>
-                    <Loader2 className="h-8 w-8 animate-spin" />
-                    <span>{t("servers.loading")}</span>
-                  </>
+                  <div className="flex flex-1 flex-col items-center justify-center gap-3 p-6">
+                    <Loader2 className="h-10 w-10 animate-spin text-primary" />
+                    <span className="text-sm text-muted-foreground">{t("servers.loading")}</span>
+                  </div>
+                ) : activeServers.length === 0 ? (
+                  /* No servers – full-screen build-from-scratch / import */
+                  <div className="flex flex-1 flex-col items-center justify-center gap-8 p-8 text-center max-w-lg mx-auto">
+                    <motion.div initial={{ opacity: 0, y: 8 }} animate={{ opacity: 1, y: 0 }} className="flex flex-col items-center gap-4">
+                      <div className="rounded-2xl bg-primary/10 p-6">
+                        <Server className="h-16 w-16 text-primary" />
+                      </div>
+                      <h2 className="text-xl font-bold text-foreground">{t("servers.noServersTitle", { defaultValue: "No servers yet" })}</h2>
+                      <p className="text-sm text-muted-foreground">{t("servers.noServersDesc", { defaultValue: "Build your first server from scratch or import an existing one." })}</p>
+                    </motion.div>
+                    <motion.div initial={{ opacity: 0, y: 8 }} animate={{ opacity: 1, y: 0 }} transition={{ delay: 0.1 }} className="flex flex-col sm:flex-row gap-3 w-full sm:w-auto">
+                      <Button
+                        size="lg"
+                        className="gap-2 rounded-xl flex-1 sm:flex-initial"
+                        onClick={() => { setCenterView("create"); setImportInitial(null); setCreateViewMinimized(false); }}
+                      >
+                        <Plus className="h-5 w-5" />
+                        {t("servers.buildFromScratch", { defaultValue: "Build from scratch" })}
+                      </Button>
+                      <Button
+                        size="lg"
+                        variant="outline"
+                        className="gap-2 rounded-xl flex-1 sm:flex-initial"
+                        onClick={() => setCenterView("import")}
+                      >
+                        <Download className="h-5 w-5" />
+                        {t("menu.importServer")}
+                      </Button>
+                    </motion.div>
+                  </div>
+                ) : slideshowActive && activeServers[slideshowIndex] ? (
+                  /* Idle slideshow: one big card */
+                  <div className="flex flex-1 flex-col items-center justify-center p-6">
+                    <motion.button
+                      type="button"
+                      key={activeServers[slideshowIndex].id}
+                      initial={{ opacity: 0, scale: 0.95 }}
+                      animate={{ opacity: 1, scale: 1 }}
+                      exit={{ opacity: 0, scale: 0.98 }}
+                      transition={{ duration: 0.35 }}
+                      className={cn(
+                        "flex flex-col items-center justify-center gap-4 rounded-3xl border-2 min-w-[240px] min-h-[200px] px-10 py-8 text-center transition-all hover:scale-[1.02] hover:shadow-xl active:scale-[0.98]",
+                        runningId === activeServers[slideshowIndex]?.id
+                          ? "border-green-500/50 bg-green-500/10 shadow-green-500/15 shadow-xl"
+                          : "border-border bg-card/90 shadow-lg hover:border-primary/30"
+                      )}
+                      onClick={() => {
+                        const s = activeServers[slideshowIndex];
+                        if (s) { setSlideshowActive(false); setSelectedId(s.id); setCenterView("server"); setTerminalTab("list"); }
+                      }}
+                          onContextMenu={(e) => {
+                        const s = activeServers[slideshowIndex];
+                        if (s) { e.preventDefault(); setSlideshowActive(false); setContextMenu({ x: e.clientX, y: e.clientY, server: s }); }
+                      }}
+                      data-context-menu="server"
+                    >
+                      <ServerIcon iconId={serverIconMap[activeServers[slideshowIndex]?.id ?? ""] ?? null} className={cn("h-16 w-16", runningId === activeServers[slideshowIndex]?.id ? "text-green-600 dark:text-green-400" : "text-primary")} />
+                      <span className="font-bold text-lg text-foreground">{activeServers[slideshowIndex]?.name}</span>
+                      {runningId === activeServers[slideshowIndex]?.id && (
+                        <span className="text-xs font-medium uppercase tracking-wider text-green-600 dark:text-green-400">{t("servers.running", { defaultValue: "Running" })}</span>
+                      )}
+                      <span className="text-xs text-muted-foreground">{t("servers.slideshowClickHint", { defaultValue: "Click to open" })}</span>
+                    </motion.button>
+                  </div>
                 ) : (
-                  <>
-                    <Gamepad2 className="h-12 w-12 text-muted-foreground/40" />
-                    <p>{t("servers.selectOrCreate")}</p>
-                  </>
+                  /* Default: list of server app boxes + Create / Import */
+                  <div className="flex flex-1 flex-col p-6">
+                    <div className="mb-6 text-center sm:text-left">
+                      <h2 className="text-lg font-semibold text-foreground">{t("servers.yourServers", { defaultValue: "Your servers" })}</h2>
+                      <p className="text-sm text-muted-foreground mt-0.5">{t("servers.pickOrCreate", { defaultValue: "Pick one to open or create a new one." })}</p>
+                    </div>
+                    <div className="flex flex-wrap items-stretch justify-center sm:justify-start gap-4 max-w-4xl">
+                      {activeServers.map((s) => (
+                        <motion.button
+                          key={s.id}
+                          type="button"
+                          initial={{ opacity: 0, scale: 0.96 }}
+                          animate={{ opacity: 1, scale: 1 }}
+                          transition={{ duration: 0.2 }}
+                          className={cn(
+                            "flex flex-col items-center justify-center gap-2 rounded-2xl border-2 min-w-[140px] min-h-[120px] px-5 py-4 text-center transition-all hover:scale-[1.02] hover:shadow-lg active:scale-[0.98]",
+                            runningId === s.id
+                              ? "border-green-500/50 bg-green-500/10 shadow-md"
+                              : "border-border bg-card shadow-sm hover:border-primary/30 hover:bg-card"
+                          )}
+                          onClick={() => { setSelectedId(s.id); setCenterView("server"); setTerminalTab("list"); }}
+                          onContextMenu={(e) => { e.preventDefault(); e.stopPropagation(); setContextMenu({ x: e.clientX, y: e.clientY, server: s }); }}
+                          data-context-menu="server"
+                        >
+                          <ServerIcon iconId={serverIconMap[s.id] ?? null} className={cn("h-9 w-9", runningId === s.id ? "text-green-600 dark:text-green-400" : "text-primary")} />
+                          <span className="font-semibold text-foreground text-sm truncate w-full">{s.name}</span>
+                          {runningId === s.id && (
+                            <span className="text-[10px] font-medium uppercase tracking-wider text-green-600 dark:text-green-400">{t("servers.running", { defaultValue: "Running" })}</span>
+                          )}
+                        </motion.button>
+                      ))}
+                      <motion.button
+                        type="button"
+                        initial={{ opacity: 0, scale: 0.96 }}
+                        animate={{ opacity: 1, scale: 1 }}
+                        transition={{ duration: 0.2, delay: 0.05 }}
+                        className="flex flex-col items-center justify-center gap-2 rounded-2xl border-2 border-dashed border-border min-w-[140px] min-h-[120px] px-5 py-4 text-center bg-muted/30 hover:border-primary/50 hover:bg-muted/50 transition-all hover:scale-[1.02] active:scale-[0.98]"
+                        onClick={() => { setCenterView("create"); setImportInitial(null); setCreateViewMinimized(false); }}
+                      >
+                        <Plus className="h-9 w-9 text-primary" />
+                        <span className="font-semibold text-foreground text-sm">{t("servers.addServer")}</span>
+                      </motion.button>
+                      <motion.button
+                        type="button"
+                        initial={{ opacity: 0, scale: 0.96 }}
+                        animate={{ opacity: 1, scale: 1 }}
+                        transition={{ duration: 0.2, delay: 0.08 }}
+                        className="flex flex-col items-center justify-center gap-2 rounded-2xl border-2 border-dashed border-border min-w-[140px] min-h-[120px] px-5 py-4 text-center bg-muted/30 hover:border-primary/50 hover:bg-muted/50 transition-all hover:scale-[1.02] active:scale-[0.98]"
+                        onClick={() => setCenterView("import")}
+                      >
+                        <Download className="h-9 w-9 text-primary" />
+                        <span className="font-semibold text-foreground text-sm">{t("menu.importServer")}</span>
+                      </motion.button>
+                      {token && getApiBaseUrl() && remoteOnlyServers.length > 0 && (
+                        <>
+                          <div className="w-full basis-full h-0 max-h-0" aria-hidden />
+                          <div className="w-full basis-full flex flex-wrap items-stretch justify-center sm:justify-start gap-4">
+                            <p className="w-full text-xs font-medium text-muted-foreground uppercase tracking-wider mt-2 mb-0">
+                              {t("servers.cloudOnlySection", { defaultValue: "On the cloud (not on this device)" })}
+                            </p>
+                            {remoteOnlyServers.map((r) => {
+                              const version = (r.metadata?.minecraft_version as string) || "";
+                              const serverType = (r.metadata?.server_type as string) || "";
+                              const modCount = (r.metadata?.mod_count as number) ?? 0;
+                              const pluginCount = (r.metadata?.plugin_count as number) ?? 0;
+                              const parts = [version, serverType].filter(Boolean);
+                              if (modCount > 0) parts.push(`${modCount} mods`);
+                              if (pluginCount > 0) parts.push(`${pluginCount} plugins`);
+                              const highlights = parts.join(" · ");
+                              return (
+                                <motion.button
+                                  key={r.id}
+                                  type="button"
+                                  initial={{ opacity: 0, scale: 0.96 }}
+                                  animate={{ opacity: 1, scale: 1 }}
+                                  transition={{ duration: 0.2 }}
+                                  className="flex flex-col items-center justify-center gap-1.5 rounded-2xl border-2 border-border min-w-[140px] min-h-[120px] px-4 py-3 text-center bg-muted/40 hover:border-primary/40 hover:bg-muted/60 transition-all hover:scale-[1.02] active:scale-[0.98]"
+                                  onClick={() => {
+                                    setImportInitial({
+                                      name: r.name,
+                                      version: version || "",
+                                      server_type: (serverType as ServerType) || undefined,
+                                    });
+                                    setCenterView("create");
+                                    setCreateViewMinimized(false);
+                                  }}
+                                >
+                                  <Cloud className="h-9 w-9 text-muted-foreground" />
+                                  <span className="font-semibold text-foreground text-sm truncate w-full">{r.name}</span>
+                                  {highlights && (
+                                    <span className="text-[10px] text-muted-foreground truncate w-full">{highlights}</span>
+                                  )}
+                                  <span className="text-[10px] text-muted-foreground">
+                                    {r.backupCount > 0
+                                      ? t("servers.backupsCount", { count: r.backupCount, defaultValue: "{{count}} backup(s)" })
+                                      : t("servers.notOnThisDeviceShort", { defaultValue: "No backups" })}
+                                  </span>
+                                  <span className="text-[10px] font-medium text-primary">
+                                    {t("servers.buildOnThisDevice", { defaultValue: "Build" })}
+                                  </span>
+                                </motion.button>
+                              );
+                            })}
+                          </div>
+                        </>
+                      )}
+                    </div>
+                  </div>
                 )}
               </div>
             )}
@@ -1501,6 +2042,8 @@ function ServerBackupSyncTab({
         metadata: {
           server_type: server.server_type,
           minecraft_version: server.minecraft_version,
+          mod_count: manifest?.mods?.length ?? 0,
+          plugin_count: manifest?.plugins?.length ?? 0,
           mods: manifest?.mods?.map((m) => m.name),
           plugins: manifest?.plugins?.map((p) => p.name),
         },
@@ -1538,6 +2081,8 @@ function ServerBackupSyncTab({
         metadata: {
           server_type: server.server_type,
           minecraft_version: server.minecraft_version,
+          mod_count: manifest?.mods?.length ?? 0,
+          plugin_count: manifest?.plugins?.length ?? 0,
           mods: manifest?.mods?.map((m) => m.name),
           plugins: manifest?.plugins?.map((p) => p.name),
         },
@@ -1573,6 +2118,8 @@ function ServerBackupSyncTab({
         metadata: {
           server_type: server.server_type,
           minecraft_version: server.minecraft_version,
+          mod_count: manifest?.mods?.length ?? 0,
+          plugin_count: manifest?.plugins?.length ?? 0,
           mods: manifest?.mods?.map((m) => m.name),
           plugins: manifest?.plugins?.map((p) => p.name),
         },
@@ -1620,6 +2167,8 @@ function ServerBackupSyncTab({
         metadata: {
           server_type: server.server_type,
           minecraft_version: server.minecraft_version,
+          mod_count: manifest?.mods?.length ?? 0,
+          plugin_count: manifest?.plugins?.length ?? 0,
           mods: manifest?.mods?.map((m) => m.name),
           plugins: manifest?.plugins?.map((p) => p.name),
         },
@@ -2525,49 +3074,49 @@ function ServerOverview({
       initial={{ opacity: 0, y: 8 }}
       animate={{ opacity: 1, y: 0 }}
       transition={{ duration: 0.2 }}
-      className="flex h-full flex-col gap-3"
+      className="flex h-full flex-col gap-2 mx-auto w-full max-w-2xl min-h-0 overflow-auto"
     >
-      {/* Header: server info + start/stop controls */}
-      <div className="flex items-start justify-between gap-4">
-        <div className="min-w-0">
-          <div className="flex items-center gap-2">
-            <h2 className="text-xl font-bold text-foreground truncate">{s.name}</h2>
-            {isRunning && (
-              <span className="h-2.5 w-2.5 rounded-full bg-green-500 animate-pulse shrink-0" />
+      {/* Bubbly card: server details up front, condensed */}
+      <div className="rounded-2xl border border-border bg-card shadow-sm overflow-hidden">
+        <div className="flex flex-wrap items-center justify-between gap-3 p-4">
+          <div className="min-w-0 flex-1">
+            <div className="flex items-center gap-2">
+              <h2 className="text-lg font-bold text-foreground truncate">{s.name}</h2>
+              {isRunning && (
+                <span className="h-2 w-2 rounded-full bg-green-500 animate-pulse shrink-0" aria-hidden />
+              )}
+            </div>
+            <p className="mt-0.5 text-xs text-muted-foreground">
+              {s.server_type} · {s.minecraft_version} · {s.memory_mb} MB · <span className="font-mono">localhost:{s.port}</span>
+            </p>
+          </div>
+          <div className="flex shrink-0 items-center gap-2">
+            {isRunning ? (
+              <Button variant="destructive" size="sm" className="gap-1.5 rounded-xl" onClick={onStop}>
+                <Square className="h-3.5 w-3.5 fill-current" />
+                {t("servers.contextStop")}
+              </Button>
+            ) : (
+              <Button
+                size="sm"
+                className="gap-1.5 rounded-xl"
+                onClick={onStart}
+                disabled={isStarting || anyRunning}
+              >
+                {isStarting ? (
+                  <Loader2 className="h-3.5 w-3.5 animate-spin" />
+                ) : (
+                  <Play className="h-3.5 w-3.5" />
+                )}
+                {isStarting ? t("servers.starting", { name: "" }).replace(/[""].*/, "").trim() : t("servers.contextStart")}
+              </Button>
             )}
           </div>
-          <div className="mt-1 flex flex-wrap gap-x-4 gap-y-1 text-sm text-muted-foreground">
-            <span>{s.server_type} &middot; {s.minecraft_version}</span>
-            <span>{s.memory_mb} MB RAM</span>
-            <span className="font-mono">localhost:{s.port}</span>
-          </div>
-        </div>
-        <div className="flex shrink-0 items-center gap-2">
-          {isRunning ? (
-            <Button variant="destructive" size="sm" className="gap-1.5" onClick={onStop}>
-              <Square className="h-3.5 w-3.5 fill-current" />
-              {t("servers.contextStop")}
-            </Button>
-          ) : (
-            <Button
-              size="sm"
-              className="gap-1.5"
-              onClick={onStart}
-              disabled={isStarting || anyRunning}
-            >
-              {isStarting ? (
-                <Loader2 className="h-3.5 w-3.5 animate-spin" />
-              ) : (
-                <Play className="h-3.5 w-3.5" />
-              )}
-              {isStarting ? t("servers.starting", { name: "" }).replace(/[""].*/, "").trim() : t("servers.contextStart")}
-            </Button>
-          )}
         </div>
       </div>
 
-      {/* Sync & website */}
-      <div className="flex flex-wrap items-center gap-2 rounded-lg border border-border/60 bg-muted/20 px-3 py-2 text-xs">
+      {/* Sync & website — bubbly */}
+      <div className="flex flex-wrap items-center gap-2 rounded-2xl border border-border/60 bg-muted/20 px-3 py-2 text-xs">
         {isSynced ? (
           <span className="flex items-center gap-1.5 text-muted-foreground">
             <Cloudy className="h-3.5 w-3.5 shrink-0 text-muted-foreground/90" />
@@ -2589,9 +3138,9 @@ function ServerOverview({
         )}
       </div>
 
-      {/* Server stats (when running) */}
+      {/* Server stats (when running) — bubbly */}
       {isRunning && (
-        <div className="flex flex-wrap items-center gap-4 rounded-xl border border-border bg-card/50 px-4 py-2.5 text-sm">
+        <div className="flex flex-wrap items-center gap-4 rounded-2xl border border-border bg-card/50 px-4 py-2.5 text-sm">
           <span className="font-medium text-muted-foreground">{t("servers.stats")}</span>
           {serverStats ? (
             <>
@@ -2611,8 +3160,8 @@ function ServerOverview({
         </div>
       )}
 
-      {/* Console log */}
-      <div className="flex flex-1 min-h-0 flex-col rounded-xl border border-border overflow-hidden">
+      {/* Console log — bubbly */}
+      <div className="flex flex-1 min-h-0 flex-col rounded-2xl border border-border overflow-hidden">
         <div className="flex items-center justify-between border-b border-border bg-muted/50 px-3 py-1.5">
           <span className="text-xs font-medium text-foreground">{t("servers.terminal")}</span>
           <div className="flex items-center gap-2">
@@ -2691,10 +3240,10 @@ function ServerOverview({
         </div>
       </div>
 
-      {/* Network & sharing section */}
-      <div className="space-y-3">
+      {/* Network & sharing section — bubbly */}
+      <div className="space-y-2">
         {isTauri() && (
-          <div className="rounded-xl border border-primary/20 bg-primary/5 p-3 space-y-3">
+          <div className="rounded-2xl border border-primary/20 bg-primary/5 p-3 space-y-3">
             <p className="text-xs font-medium text-foreground">{t("servers.relayShareTitle")}</p>
             {shareAddress ? (
               <div className="space-y-1.5">

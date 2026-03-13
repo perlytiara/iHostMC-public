@@ -94,6 +94,9 @@ pub fn preferences_path() -> PathBuf {
 pub struct Preferences {
     #[serde(default = "default_run_in_background")]
     pub run_in_background: bool,
+    /// When true, server picker shows an idle slideshow cycling between servers (like a screensaver).
+    #[serde(default = "default_idle_slideshow")]
+    pub idle_slideshow: bool,
     #[serde(default)]
     pub curseforge_api_key: Option<String>,
 }
@@ -102,10 +105,15 @@ fn default_run_in_background() -> bool {
     true
 }
 
+fn default_idle_slideshow() -> bool {
+    true
+}
+
 impl Default for Preferences {
     fn default() -> Self {
         Self {
             run_in_background: true,
+            idle_slideshow: true,
             curseforge_api_key: None,
         }
     }

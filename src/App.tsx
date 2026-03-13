@@ -9,6 +9,11 @@ import { AppContextMenu } from "@/components/AppContextMenu";
 import { Toaster } from "@/components/Toaster";
 import { LoadingScreen } from "@/components/LoadingScreen";
 import { OnboardingOverlay } from "@/components/OnboardingOverlay";
+import {
+  HighlightTourOverlay,
+  getHighlightTourComplete,
+  setHighlightTourComplete,
+} from "@/components/HighlightTourOverlay";
 import { UpdateAvailableDialog } from "@/components/UpdateAvailableDialog";
 import { useDevMenuShortcut } from "@/hooks/useDevMenuShortcut";
 import { useInspectShortcut } from "@/hooks/useInspectShortcut";
@@ -157,6 +162,7 @@ function AppContent() {
   const [menuViewRequest, setMenuViewRequest] = useState<MenuViewRequest>(null);
   const [menuBarServerContext, setMenuBarServerContext] = useState<MenuBarServerContext | null>(null);
   const [runInBackground, setRunInBackground] = useState(true);
+  const [idleSlideshow, setIdleSlideshow] = useState(true);
   const [testControlUrl, setTestControlUrl] = useState<string | null>(null);
   const [updateAvailable, setUpdateAvailable] = useState<{ version: string; body: string | null } | null>(null);
   const [updateDialogDismissed, setUpdateDialogDismissed] = useState(false);
@@ -171,6 +177,8 @@ function AppContent() {
   const [onboardingComplete, setOnboardingCompleteState] = useState(() =>
     typeof window !== "undefined" && !!localStorage.getItem(ONBOARDING_COMPLETE_KEY)
   );
+  const [highlightTourActive, setHighlightTourActive] = useState(false);
+  const [highlightTourStep, setHighlightTourStep] = useState(0);
   const [developerMenuEnabled, setDeveloperMenuEnabledState] = useState(() =>
     typeof window !== "undefined" && localStorage.getItem(DEVELOPER_MENU_KEY) === "true"
   );
@@ -201,6 +209,19 @@ function AppContent() {
     const stored = getStoredPage();
     if (stored !== "home") setCurrentPage(stored);
   }, []);
+
+  // Start highlight tour when on home and tour not yet completed (e.g. returning user who finished onboarding earlier)
+  useEffect(() => {
+    if (
+      currentPage === "home" &&
+      onboardingComplete &&
+      !getHighlightTourComplete() &&
+      !highlightTourActive
+    ) {
+      setHighlightTourStep(0);
+      setHighlightTourActive(true);
+    }
+  }, [currentPage, onboardingComplete, highlightTourActive]);
 
   // After login or logout, keep user on settings so the UI doesn't break to a blank page
   useEffect(() => {
@@ -245,6 +266,9 @@ function AppContent() {
   useEffect(() => {
     if (!isTauri()) return;
     invoke<boolean>("get_run_in_background").then(setRunInBackground).catch(() => {});
+    invoke<boolean>("get_idle_slideshow")
+      .then(setIdleSlideshow)
+      .catch(() => { setIdleSlideshow(true); });
   }, []);
 
   useEffect(() => {
@@ -471,9 +495,12 @@ function AppContent() {
                 onMenuViewRequestHandled={() => setMenuViewRequest(null)}
                 runInBackground={runInBackground}
                 onRunInBackgroundChange={setRunInBackground}
+                idleSlideshow={idleSlideshow}
+                onIdleSlideshowChange={setIdleSlideshow}
                 onMenuBarServerContextChange={setMenuBarServerContext}
                 onServerCountChange={setServerCount}
                 onRunningCountChange={setRunningCount}
+                onGoToHome={() => setCurrentPage("home")}
               />
             </PageTransition>
           )}
@@ -499,6 +526,8 @@ function AppContent() {
                 onEnsureAccountVisible={() => { setCurrentPage("settings"); setInitialSettingsTab("account"); }}
                 runInBackground={runInBackground}
                 onRunInBackgroundChange={setRunInBackground}
+                idleSlideshow={idleSlideshow}
+                onIdleSlideshowChange={setIdleSlideshow}
                 initialTab={initialSettingsTab ?? undefined}
                 onInitialTabConsumed={() => setInitialSettingsTab(null)}
               />
@@ -535,8 +564,23 @@ function AppContent() {
           try {
             localStorage.setItem(ONBOARDING_COMPLETE_KEY, "1");
           } catch {}
+          if (!getHighlightTourComplete() && currentPage === "home") {
+            setHighlightTourStep(0);
+            setHighlightTourActive(true);
+          }
         }}
       />
+      {currentPage === "home" && (
+        <HighlightTourOverlay
+          active={highlightTourActive}
+          step={highlightTourStep}
+          onNext={() => setHighlightTourStep((s) => s + 1)}
+          onComplete={() => {
+            setHighlightTourComplete();
+            setHighlightTourActive(false);
+          }}
+        />
+      )}
     </div>
     </DeveloperMenuContext.Provider>
     </SettingsNavContext.Provider>

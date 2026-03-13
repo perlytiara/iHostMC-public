@@ -36,6 +36,8 @@ pub fn run() {
         .invoke_handler(tauri::generate_handler![
             commands::get_run_in_background,
             commands::set_run_in_background,
+            commands::get_idle_slideshow,
+            commands::set_idle_slideshow,
             commands::quit_app,
             commands::list_servers,
             commands::get_server_ports,

@@ -71,12 +71,14 @@ interface SettingsViewProps {
   onEnsureAccountVisible?: () => void;
   runInBackground?: boolean;
   onRunInBackgroundChange?: (value: boolean) => void;
+  idleSlideshow?: boolean;
+  onIdleSlideshowChange?: (value: boolean) => void;
   /** Open directly to this tab (e.g. "account" from Home) */
   initialTab?: SettingsTab;
   onInitialTabConsumed?: () => void;
 }
 
-export function SettingsView({ onClose, onEnsureAccountVisible, runInBackground = true, onRunInBackgroundChange, initialTab, onInitialTabConsumed }: SettingsViewProps) {
+export function SettingsView({ onClose, onEnsureAccountVisible, runInBackground = true, onRunInBackgroundChange, idleSlideshow = true, onIdleSlideshowChange, initialTab, onInitialTabConsumed }: SettingsViewProps) {
   const { t, i18n } = useTranslation();
   const { theme, setTheme } = useTheme();
   const { style, palette, setStyle, setPalette } = useDesign();
@@ -305,19 +307,34 @@ export function SettingsView({ onClose, onEnsureAccountVisible, runInBackground 
                 )}
               </div>
               {isTauri() && (
-                <div className="flex items-center justify-between rounded-xl border border-border bg-card p-4">
-                  <div>
-                    <p className="text-sm font-medium">{t("settings.runInBackground")}</p>
-                    <p className="text-xs text-muted-foreground mt-0.5">{t("settings.runInBackgroundDesc")}</p>
+                <>
+                  <div className="flex items-center justify-between rounded-xl border border-border bg-card p-4">
+                    <div>
+                      <p className="text-sm font-medium">{t("settings.runInBackground")}</p>
+                      <p className="text-xs text-muted-foreground mt-0.5">{t("settings.runInBackgroundDesc")}</p>
+                    </div>
+                    <ToggleSwitch
+                      checked={runInBackground}
+                      onChange={async (checked) => {
+                        await invoke("set_run_in_background", { run: checked });
+                        onRunInBackgroundChange?.(checked);
+                      }}
+                    />
                   </div>
-                  <ToggleSwitch
-                    checked={runInBackground}
-                    onChange={async (checked) => {
-                      await invoke("set_run_in_background", { run: checked });
-                      onRunInBackgroundChange?.(checked);
-                    }}
-                  />
-                </div>
+                  <div className="flex items-center justify-between rounded-xl border border-border bg-card p-4">
+                    <div>
+                      <p className="text-sm font-medium">{t("settings.idleSlideshow")}</p>
+                      <p className="text-xs text-muted-foreground mt-0.5">{t("settings.idleSlideshowDesc")}</p>
+                    </div>
+                    <ToggleSwitch
+                      checked={idleSlideshow}
+                      onChange={async (checked) => {
+                        await invoke("set_idle_slideshow", { enabled: checked });
+                        onIdleSlideshowChange?.(checked);
+                      }}
+                    />
+                  </div>
+                </>
               )}
             </motion.div>
           )}

@@ -1093,7 +1093,11 @@ export interface BackupManifest {
   preset?: SnapshotPreset;
 }
 
-/** One sync server as returned by GET /api/sync/servers (used by app and website). */
+/**
+ * One sync server as returned by GET /api/sync/servers (used by app and website).
+ * Website can show: name, version (metadata.minecraft_version), mod loader (metadata.server_type),
+ * mod count (metadata.mod_count), plugin count (metadata.plugin_count), highlights (metadata.mods/plugins).
+ */
 export interface SyncServerInfo {
   id: string;
   hostId: string;
@@ -1102,6 +1106,7 @@ export interface SyncServerInfo {
   lastBackupAt: string | null;
   backupCount: number;
   miniSynced: boolean;
+  /** server_type, minecraft_version, mod_count?, plugin_count?, mods[]?, plugins[]? for website list/details. */
   metadata: Record<string, unknown>;
   updatedAt: string;
   /** Iteration schedule (synced from website/app); used to show occurrences live. */
@@ -1122,6 +1127,8 @@ export interface SyncServerInfo {
   iterationSaveTier?: "snapshot" | "structural" | "full" | null;
   /** When set, server is in trash (soft-deleted). */
   trashedAt?: string | null;
+  /** When set, server is archived (hidden from main list on website). */
+  archived?: boolean;
 }
 
 /** One synced file as returned by GET /api/sync/servers/:id/files */
