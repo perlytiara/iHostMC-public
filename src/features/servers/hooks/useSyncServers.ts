@@ -73,6 +73,8 @@ export function useSyncServers(
           metadata: {
             server_type: s.server_type,
             minecraft_version: s.minecraft_version,
+            memory_mb: s.memory_mb,
+            port: s.port,
           },
         });
         if (serverId && s.id === serverId) backendId = res.id;

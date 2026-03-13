@@ -250,6 +250,7 @@ export function ServerList({
     (s) => !s.trashedAt && !s.archived && !servers.some((l) => l.id === s.hostId)
   );
   const [activeExpanded, setActiveExpanded] = useState(true);
+  const [inactiveExpanded, setInactiveExpanded] = useState(false);
   const [archiveExpanded, setArchiveExpanded] = useState(false);
   const [trashExpanded, setTrashExpanded] = useState(false);
   const [creatingServer, setCreatingServer] = useState<{ creating: boolean; name?: string }>({ creating: false });
@@ -683,6 +684,15 @@ export function ServerList({
   const isRunning = runningId !== null;
   const [sidebarCollapsed, setSidebarCollapsed] = useState(true);
 
+  // Auto-refresh server list and synced servers periodically (no manual refresh needed in mini sidebar)
+  useEffect(() => {
+    const interval = setInterval(async () => {
+      refresh();
+      if (token && getApiBaseUrl()) await refreshSynced();
+    }, 45000);
+    return () => clearInterval(interval);
+  }, [token, refresh, refreshSynced]);
+
   const sendServerCommand = useCallback((cmd: string) => {
     const line = cmd.endsWith("\n") ? cmd : `${cmd}\n`;
     invoke("send_server_input", { input: line }).catch(() => {});
@@ -714,16 +724,10 @@ export function ServerList({
           <div className={cn("flex shrink-0 border-b border-border p-2", sidebarCollapsed ? "flex-col items-center gap-1.5" : "items-center gap-1 px-2")}>
             {sidebarCollapsed ? (
               <>
-                <Button size="icon" variant="ghost" className="h-8 w-8 shrink-0 rounded-lg" onClick={() => { setSelectedId(null); setCenterView("server"); }} title={t("servers.viewAllServers", { defaultValue: "View all servers" })}>
-                  <LayoutDashboard className="h-4 w-4" />
-                </Button>
-                <Button size="icon" variant="ghost" className="h-8 w-8 shrink-0 rounded-lg" onClick={() => setSidebarCollapsed(false)} title={t("servers.openServerList", { defaultValue: "Open server list" })}>
-                  <PanelLeft className="h-4 w-4" />
+                <Button size="icon" variant="ghost" className="h-8 w-8 shrink-0 rounded-lg" onClick={() => setSidebarCollapsed(false)} title={t("servers.openServerList", { defaultValue: "Open server list" })} aria-label={t("servers.openServerList", { defaultValue: "Open server list" })}>
+                  <ChevronRight className="h-4 w-4" />
                 </Button>
                 <div className="flex flex-col items-center gap-0.5">
-                  <Button size="icon" variant="ghost" className="h-7 w-7 shrink-0 rounded-md" onClick={async () => { refresh(); if (token && getApiBaseUrl()) await refreshSynced(); }} disabled={metaSyncing} title={t("servers.refreshList", { defaultValue: "Refresh" })}>
-                    {metaSyncing ? <Loader2 className="h-3.5 w-3.5 animate-spin" /> : <RefreshCw className="h-3.5 w-3.5" />}
-                  </Button>
                   <Button size="icon" variant="ghost" className="h-7 w-7 shrink-0 rounded-md" onClick={() => { setCenterView("create"); setImportInitial(null); setCreateViewMinimized(false); }} title={t("servers.addServer")}>
                     <Plus className="h-3.5 w-3.5" />
                   </Button>
@@ -1003,6 +1007,61 @@ export function ServerList({
                 </>
               )}
             </div>
+            {token && getApiBaseUrl() && remoteOnlyServers.length > 0 && (
+              <div className="mt-2 shrink-0 border-t border-border/60 p-2">
+                <button
+                  type="button"
+                  className="flex w-full items-center gap-2 rounded px-2 py-1.5 text-left text-xs font-medium text-muted-foreground hover:bg-muted/50 hover:text-foreground transition-colors"
+                  onClick={() => setInactiveExpanded((x) => !x)}
+                  title={t("servers.cloudOnlySection", { defaultValue: "On the cloud (not on this device)" })}
+                >
+                  {inactiveExpanded ? <ChevronDown className="h-3.5 w-3.5 shrink-0" /> : <ChevronRight className="h-3.5 w-3.5 shrink-0" />}
+                  <Cloud className="h-3.5 w-3.5 shrink-0 opacity-80" />
+                  {t("servers.inactiveSection", { defaultValue: "Inactive (not on this device)" })} ({remoteOnlyServers.length})
+                </button>
+                {inactiveExpanded && (
+                  <ul className="mt-1 space-y-1">
+                    {remoteOnlyServers.map((r) => {
+                      const version = (r.metadata?.minecraft_version as string) || "";
+                      const serverType = (r.metadata?.server_type as string) || "";
+                      return (
+                        <motion.li
+                          key={r.id}
+                          initial={{ opacity: 0 }}
+                          animate={{ opacity: 1 }}
+                          exit={{ opacity: 0 }}
+                          className="flex flex-col gap-0.5 rounded-lg border border-border/60 bg-muted/20 px-2 py-1.5 text-xs text-muted-foreground"
+                        >
+                          <div className="flex items-center justify-between gap-2">
+                            <span className="min-w-0 flex-1 truncate font-medium text-foreground">{r.name}</span>
+                            <Button
+                              size="icon"
+                              variant="ghost"
+                              className="h-6 w-6 shrink-0 text-primary"
+                              onClick={() => {
+                                setImportInitial({
+                                  name: r.name,
+                                  version: version || "",
+                                  server_type: (serverType as ServerType) || undefined,
+                                });
+                                setCenterView("create");
+                                setCreateViewMinimized(false);
+                              }}
+                              title={t("servers.buildOnThisDevice", { defaultValue: "Build" })}
+                            >
+                              <Download className="h-3 w-3" />
+                            </Button>
+                          </div>
+                          {(version || serverType) && (
+                            <span className="truncate text-[10px]">{[version, serverType].filter(Boolean).join(" · ")}</span>
+                          )}
+                        </motion.li>
+                      );
+                    })}
+                  </ul>
+                )}
+              </div>
+            )}
             {archivedServers.length > 0 && (
               <div className="mt-2 shrink-0 border-t border-border/60 p-2">
                 <button
@@ -1673,7 +1732,7 @@ export function ServerList({
                   </div>
                 ) : activeServers.length === 0 ? (
                   /* No servers – full-screen build-from-scratch / import */
-                  <div className="flex flex-1 flex-col items-center justify-center gap-8 p-8 text-center max-w-lg mx-auto">
+                  <div className="flex flex-1 flex-col items-center justify-center gap-8 p-8 text-center w-full max-w-2xl mx-auto">
                     <motion.div initial={{ opacity: 0, y: 8 }} animate={{ opacity: 1, y: 0 }} className="flex flex-col items-center gap-4">
                       <div className="rounded-2xl bg-primary/10 p-6">
                         <Server className="h-16 w-16 text-primary" />
@@ -1742,7 +1801,7 @@ export function ServerList({
                       <h2 className="text-lg font-semibold text-foreground">{t("servers.yourServers", { defaultValue: "Your servers" })}</h2>
                       <p className="text-sm text-muted-foreground mt-0.5">{t("servers.pickOrCreate", { defaultValue: "Pick one to open or create a new one." })}</p>
                     </div>
-                    <div className="flex flex-wrap items-stretch justify-center sm:justify-start gap-4 max-w-4xl">
+                    <div className="flex flex-wrap items-stretch justify-center sm:justify-start gap-4 w-full">
                       {activeServers.map((s) => (
                         <motion.button
                           key={s.id}
@@ -3074,7 +3133,7 @@ function ServerOverview({
       initial={{ opacity: 0, y: 8 }}
       animate={{ opacity: 1, y: 0 }}
       transition={{ duration: 0.2 }}
-      className="flex h-full flex-col gap-2 mx-auto w-full max-w-2xl min-h-0 overflow-auto"
+      className="flex h-full flex-col gap-2 w-full min-h-0 overflow-auto"
     >
       {/* Bubbly card: server details up front, condensed */}
       <div className="rounded-2xl border border-border bg-card shadow-sm overflow-hidden">
