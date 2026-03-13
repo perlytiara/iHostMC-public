@@ -7,17 +7,17 @@ This is the **desktop app only** (public repo). No backend, no website, no serve
 In your private repo (iHost):
 
 ```bash
-git submodule add https://github.com/perlytiara/iHostMC.git iHostMC-public
+git submodule add https://github.com/perlytiara/iHostMC.git iHostMC
 ```
 
 Then to refresh the app code from the private repo:
 
 ```bash
 ./scripts/build-public-repo.sh
-cd iHostMC-public && git add -A && git status && git commit -m "Sync app from private" && git push
+cd iHostMC && git add -A && git status && git commit -m "Sync app from private" && git push
 ```
 
-Or run `./scripts/sync-public-repo.sh ./iHostMC-public --push` (with iHostMC-public as the submodule path).
+Or run `./scripts/sync-public-repo.sh ./iHostMC --push` (with iHostMC as the submodule path).
 
 ## In this repo (contributors)
 
