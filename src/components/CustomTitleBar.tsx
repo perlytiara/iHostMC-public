@@ -27,11 +27,12 @@ import {
 } from "lucide-react";
 import { useContext } from "react";
 import { cn, isTauri } from "@/lib/utils";
+import { APP_VERSION } from "@/lib/version.generated";
 import { getCurrentWindow } from "@tauri-apps/api/window";
 import * as DropdownMenu from "@radix-ui/react-dropdown-menu";
 import type { AppPage } from "@/App";
 import type { MenuBarServerContext } from "@/App";
-import { SettingsNavContext } from "@/App";
+import { SettingsNavContext, DeveloperMenuContext } from "@/App";
 
 interface CustomTitleBarProps {
   currentPage: AppPage;
@@ -83,6 +84,7 @@ export function CustomTitleBar({
   const { t } = useTranslation();
   const { theme, setTheme, isDark } = useTheme();
   const { settingsAsIcon } = useContext(SettingsNavContext);
+  const { developerMenuEnabled } = useContext(DeveloperMenuContext);
 
   let win: ReturnType<typeof getCurrentWindow> | null = null;
   try {
@@ -193,7 +195,7 @@ export function CustomTitleBar({
                   <Info className="h-3.5 w-3.5" /> {t("menu.about")} iHostMC
                 </DropdownMenu.Item>
                 <DropdownMenu.Item className={itemClass} disabled>
-                  {t("menu.version")}: {t("common.version")}
+                  {t("menu.version")}: v{APP_VERSION}
                 </DropdownMenu.Item>
                 {onCheckForUpdates && (
                   <DropdownMenu.Item className={itemClass} onSelect={onCheckForUpdates}>
@@ -214,7 +216,7 @@ export function CustomTitleBar({
                 <DropdownMenu.Item className={itemClass} onSelect={onWindowTools}>
                   <Wrench className="h-3.5 w-3.5" /> {t("menu.tools")}
                 </DropdownMenu.Item>
-                {import.meta.env.VITE_PUBLIC_REPO !== "true" && (
+                {developerMenuEnabled && (
                   <DropdownMenu.Item className={itemClass} onSelect={onDevMenu}>
                     <Bug className="h-3.5 w-3.5" /> {t("menu.devMenu")}
                   </DropdownMenu.Item>
@@ -294,7 +296,7 @@ export function CustomTitleBar({
                 <p className="mt-0.5">{t("menu.aboutDescription")}</p>
               </div>
               <div className="px-2.5 py-1.5 text-[11px] text-muted-foreground border-b border-border mb-1">
-                {t("menu.version")}: {t("common.version")}
+                {t("menu.version")}: v{APP_VERSION}
               </div>
               <DropdownMenu.Item className={itemClass} onSelect={() => onNavigate("storage")}>
                 <FolderArchive className="h-3.5 w-3.5" /> {t("nav.storage")}
@@ -331,8 +333,8 @@ export function CustomTitleBar({
               <DropdownMenu.Item className={itemClass} onSelect={onWindowTools}>
                 <Wrench className="h-3.5 w-3.5" /> {t("menu.tools")}
               </DropdownMenu.Item>
-              {import.meta.env.DEV && (
-                <DropdownMenu.Item className={itemClass} onSelect={() => onNavigate("dev")}>
+              {developerMenuEnabled && (
+                <DropdownMenu.Item className={itemClass} onSelect={onDevMenu}>
                   <Bug className="h-3.5 w-3.5" /> {t("menu.developer")}
                 </DropdownMenu.Item>
               )}

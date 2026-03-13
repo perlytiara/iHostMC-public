@@ -12,7 +12,7 @@ import { isBackendConfigured } from "@/lib/api-client";
 import { toast } from "@/lib/toast-store";
 import { useAccountData } from "@/contexts/AccountDataContext";
 
-const BILLING_SETUP_GUIDE_URL = "https://github.com/perlytiara/iHostMC/blob/main/docs/SERVER-BILLING-PROMPT.md";
+const BILLING_SETUP_GUIDE_URL = "https://github.com/perlytiara/iHost/blob/main/docs/SERVER-BILLING-PROMPT.md";
 
 const TIER_ICONS: Record<string, typeof Server> = {
   free: Server,

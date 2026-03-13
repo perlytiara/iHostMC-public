@@ -1,5 +1,6 @@
 import { create } from "zustand";
 import { persist } from "zustand/middleware";
+import { clearRelayTokenCache } from "@/lib/tunnel-prefs";
 
 const STORAGE_KEY = "ihostmc-auth";
 
@@ -20,7 +21,10 @@ export const useAuthStore = create<AuthState>()(
     (set) => ({
       user: null,
       setUser: (user) => set({ user }),
-      logout: () => set({ user: null }),
+      logout: () => {
+        clearRelayTokenCache();
+        set({ user: null });
+      },
     }),
     { name: STORAGE_KEY }
   )

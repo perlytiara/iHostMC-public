@@ -15,6 +15,10 @@ import {
   Play,
   Square,
   Trash2,
+  Archive,
+  ArchiveRestore,
+  RotateCcw,
+  RefreshCw,
   FolderOpen,
   Pencil,
   Download,
@@ -33,7 +37,6 @@ import {
   Package,
   FileText,
   ScanSearch,
-  RefreshCw,
   Info,
   HardDrive,
   LayoutDashboard,
@@ -141,6 +144,12 @@ export function ServerList({
   const { syncedServers, syncNow, syncing: metaSyncing, refreshSynced } = useSyncServers(servers, token, {
     autoSyncOnLoad: getAutoBackupEnabled(),
   });
+  const activeServers = servers.filter((s) => !s.archived && !s.trashed_at);
+  const archivedServers = servers.filter((s) => s.archived && !s.trashed_at);
+  const trashedServers = servers.filter((s) => s.trashed_at);
+  const [activeExpanded, setActiveExpanded] = useState(true);
+  const [archiveExpanded, setArchiveExpanded] = useState(false);
+  const [trashExpanded, setTrashExpanded] = useState(false);
   const [creatingServer, setCreatingServer] = useState<{ creating: boolean; name?: string }>({ creating: false });
   const [createViewMinimized, setCreateViewMinimized] = useState(false);
   const [centerView, setCenterView] = useState<CenterView>("server");
@@ -206,6 +215,16 @@ export function ServerList({
     const id = setInterval(refreshSynced, SYNC_REFRESH_MS);
     return () => clearInterval(id);
   }, [token, selectedId, refreshSynced]);
+
+  // Refresh when app window regains focus (sync with website)
+  useEffect(() => {
+    const onFocus = () => {
+      refresh();
+      if (token && getApiBaseUrl()) refreshSynced();
+    };
+    window.addEventListener("focus", onFocus);
+    return () => window.removeEventListener("focus", onFocus);
+  }, [refresh, refreshSynced, token]);
 
   useEffect(() => {
     if (!selectedId) {
@@ -275,33 +294,125 @@ export function ServerList({
   }, []);
 
   const requestDeleteServer = useCallback((server: ServerConfig) => {
-    if (import.meta.env.DEV) console.log("[iHostMC] Delete requested for:", server.id, server.name);
+    if (import.meta.env.DEV) console.log("[iHostMC] Delete/trash requested for:", server.id, server.name);
     setContextMenu(null);
     setServerToDelete(server);
   }, []);
+
+  const confirmTrashServer = useCallback(async () => {
+    if (!serverToDelete || isDeleting || serverToDelete.trashed_at) return;
+    const id = serverToDelete.id;
+    const name = serverToDelete.name;
+    setIsDeleting(true);
+    try {
+      await invoke("trash_server", { id });
+      if (token && getApiBaseUrl()) {
+        try { await api.trashSyncServer(token, id); } catch { /* ignore */ }
+      }
+      setServerToDelete(null);
+      if (selectedId === id) setSelectedId(null);
+      refresh();
+      await refreshSynced();
+      toast.success(t("servers.trashSuccess", { name }));
+    } catch (e) {
+      const msg = typeof e === "string" ? e : e instanceof Error ? e.message : String(e);
+      toast.error(msg);
+    } finally {
+      setIsDeleting(false);
+    }
+  }, [serverToDelete, isDeleting, token, selectedId, refresh, refreshSynced, t]);
 
   const confirmDeleteServer = useCallback(async () => {
     if (!serverToDelete || isDeleting) return;
     const id = serverToDelete.id;
     const name = serverToDelete.name;
-    if (import.meta.env.DEV) console.log("[iHostMC] Confirming delete for:", id, name);
     setIsDeleting(true);
     try {
       await invoke("delete_server", { id });
-      if (import.meta.env.DEV) console.log("[iHostMC] Server deleted successfully:", id);
+      if (token && getApiBaseUrl()) {
+        try { await api.permanentDeleteSyncServer(token, id); } catch { /* ignore */ }
+      }
       setServerToDelete(null);
       if (selectedId === id) setSelectedId(null);
       if (runningId === id) setRunningId(null);
       refresh();
+      await refreshSynced();
       toast.success(t("servers.deletedSuccess", { name }));
     } catch (e) {
-      if (import.meta.env.DEV) console.error("[iHostMC] Delete failed:", e);
-      const msg = typeof e === "string" ? e : e instanceof Error ? e.message : e != null && typeof e === "object" && "message" in e ? String((e as { message: unknown }).message) : String(e);
+      const msg = typeof e === "string" ? e : e instanceof Error ? e.message : String(e);
       toast.error(msg);
     } finally {
       setIsDeleting(false);
     }
-  }, [serverToDelete, isDeleting, selectedId, runningId, refresh, t]);
+  }, [serverToDelete, isDeleting, token, selectedId, runningId, refresh, refreshSynced, t]);
+
+  const requestArchiveServer = useCallback(async (server: ServerConfig) => {
+    if (server.archived || server.trashed_at || isDeleting) return;
+    const id = server.id;
+    const name = server.name;
+    setContextMenu(null);
+    setIsDeleting(true);
+    try {
+      await invoke("archive_server", { id });
+      if (token && getApiBaseUrl()) {
+        try { await api.archiveSyncServer(token, id); } catch { /* ignore */ }
+      }
+      if (selectedId === id) setSelectedId(null);
+      refresh();
+      await refreshSynced();
+      toast.success(t("servers.archiveSuccess", { name }));
+    } catch (e) {
+      const msg = typeof e === "string" ? e : e instanceof Error ? e.message : String(e);
+      toast.error(msg);
+    } finally {
+      setIsDeleting(false);
+    }
+  }, [token, isDeleting, selectedId, refresh, refreshSynced, t]);
+
+  const requestUnarchiveServer = useCallback(async (server: ServerConfig) => {
+    if (!server.archived || isDeleting) return;
+    const id = server.id;
+    const name = server.name;
+    setContextMenu(null);
+    setIsDeleting(true);
+    try {
+      await invoke("unarchive_server", { id });
+      if (token && getApiBaseUrl()) {
+        try { await api.unarchiveSyncServer(token, id); } catch { /* ignore */ }
+      }
+      refresh();
+      await refreshSynced();
+      toast.success(t("servers.unarchiveSuccess", { name }));
+    } catch (e) {
+      const msg = typeof e === "string" ? e : e instanceof Error ? e.message : String(e);
+      toast.error(msg);
+    } finally {
+      setIsDeleting(false);
+    }
+  }, [token, isDeleting, refresh, refreshSynced, t]);
+
+  const requestRestoreServer = useCallback(async (server: ServerConfig) => {
+    if (!server.trashed_at || isDeleting) return;
+    const id = server.id;
+    const name = server.name;
+    setContextMenu(null);
+    setIsDeleting(true);
+    try {
+      await invoke("restore_server", { id });
+      if (token && getApiBaseUrl()) {
+        try { await api.restoreSyncServer(token, id); } catch { /* ignore */ }
+      }
+      if (selectedId === id) setSelectedId(null);
+      refresh();
+      await refreshSynced();
+      toast.success(t("servers.restoreSuccess", { name }));
+    } catch (e) {
+      const msg = typeof e === "string" ? e : e instanceof Error ? e.message : String(e);
+      toast.error(msg);
+    } finally {
+      setIsDeleting(false);
+    }
+  }, [token, isDeleting, refresh, refreshSynced, t]);
 
   const cancelDeleteServer = useCallback(() => setServerToDelete(null), []);
 
@@ -445,6 +556,9 @@ export function ServerList({
             <>
               <span className="text-sm font-semibold">{t("servers.title")}</span>
               <div className="flex items-center gap-0.5">
+                <Button size="icon" variant="ghost" className="h-8 w-8" onClick={async () => { refresh(); if (token && getApiBaseUrl()) await refreshSynced(); }} disabled={metaSyncing} title={t("servers.refreshList", { defaultValue: "Refresh" })}>
+                  {metaSyncing ? <Loader2 className="h-4 w-4 animate-spin" /> : <RefreshCw className="h-4 w-4" />}
+                </Button>
                 <Button size="icon" variant="ghost" className="h-8 w-8" onClick={() => setSidebarCollapsed(true)}>
                   <PanelLeftClose className="h-4 w-4" />
                 </Button>
@@ -460,25 +574,37 @@ export function ServerList({
         </div>
         {!sidebarCollapsed && (
           <>
-            {servers.length >= SOFT_SERVER_LIMIT && (
+            {activeServers.length >= SOFT_SERVER_LIMIT && (
               <div className="shrink-0 border-b border-amber-500/30 bg-amber-500/10 px-3 py-2 text-xs text-amber-700 dark:text-amber-400">
-                {t("servers.manyServersBanner", { count: servers.length })}
+                {t("servers.manyServersBanner", { count: activeServers.length })}
               </div>
             )}
-            <div className="flex-1 overflow-y-auto p-2">
+            <div className="flex-1 min-h-0 overflow-y-auto flex flex-col p-2">
               {serversLoading ? (
                 <div className="flex flex-col items-center justify-center gap-2 py-8">
                   <Loader2 className="h-6 w-6 animate-spin text-muted-foreground" />
                   <span className="text-xs text-muted-foreground">{t("servers.loading")}</span>
                 </div>
-              ) : servers.length === 0 ? (
+              ) : activeServers.length === 0 && archivedServers.length === 0 && trashedServers.length === 0 ? (
                 <div className="flex flex-col items-center gap-2 py-8 text-center">
                   <Gamepad2 className="h-8 w-8 text-muted-foreground/50" />
                   <p className="text-xs text-muted-foreground">{t("servers.selectOrCreate")}</p>
                 </div>
               ) : (
+                <>
+                <div className="flex w-full items-center gap-1 rounded-lg px-2 py-1.5 text-xs font-medium text-muted-foreground">
+                  <button
+                    type="button"
+                    onClick={() => setActiveExpanded((e) => !e)}
+                    className="flex flex-1 min-w-0 items-center gap-2 rounded py-0.5 -my-0.5 hover:bg-muted/70 text-left"
+                  >
+                    {activeExpanded ? <ChevronDown className="h-3.5 w-3.5 shrink-0" /> : <ChevronRight className="h-3.5 w-3.5 shrink-0" />}
+                    {t("servers.activeSection", "Active")} ({activeServers.length})
+                  </button>
+                </div>
+                {activeExpanded && (
                 <AnimatePresence>
-                  <ul className="space-y-2">
+                  <ul className="mt-1 space-y-2">
                     {creatingServer.creating && (
                       <motion.li
                         variants={sidebarItemVariants}
@@ -514,7 +640,7 @@ export function ServerList({
                         <span className="h-2 w-2 rounded-full bg-primary animate-pulse shrink-0" aria-hidden />
                       </motion.li>
                     )}
-                    {servers.map((s, i) => {
+                    {activeServers.map((s, i) => {
                       const syncedRec = syncedServers.find((r) => r.hostId === s.id);
                       const cloudState: "none" | "registered" | "mini" | "saved" = !syncedRec
                         ? "none"
@@ -639,9 +765,6 @@ export function ServerList({
                               <Play className="h-3.5 w-3.5" />
                             )}
                           </Button>
-                          <Button size="icon" variant="ghost" className="h-7 w-7 text-muted-foreground hover:text-destructive" onClick={(e) => { e.stopPropagation(); requestDeleteServer(s); }} disabled={runningId === s.id || startingId === s.id} title={t("servers.contextDelete")}>
-                            <Trash2 className="h-3.5 w-3.5" />
-                          </Button>
                         </div>
                         {runningId === s.id && (
                           <span className="ml-1.5 h-2 w-2 rounded-full bg-primary animate-pulse" />
@@ -650,8 +773,136 @@ export function ServerList({
                     ); })}
                   </ul>
                 </AnimatePresence>
+                )}
+                </>
               )}
             </div>
+            {archivedServers.length > 0 && (
+              <div className="mt-2 shrink-0 border-t border-border/60 p-2">
+                <button
+                  type="button"
+                  className="flex w-full items-center gap-2 rounded px-2 py-1.5 text-left text-xs font-medium text-muted-foreground hover:bg-muted/50 hover:text-foreground transition-colors"
+                  onClick={() => setArchiveExpanded((x) => !x)}
+                  title={t("servers.archiveSection")}
+                >
+                  {archiveExpanded ? <ChevronDown className="h-3.5 w-3.5 shrink-0" /> : <ChevronRight className="h-3.5 w-3.5 shrink-0" />}
+                  <Archive className="h-3.5 w-3.5 shrink-0 opacity-80" />
+                  {t("servers.archiveSection")} ({archivedServers.length})
+                </button>
+                {archiveExpanded && (
+                  <ul className="mt-1 space-y-1">
+                    {archivedServers.map((s) => (
+                      <motion.li
+                        key={s.id}
+                        initial={{ opacity: 0 }}
+                        animate={{ opacity: 1 }}
+                        exit={{ opacity: 0 }}
+                        data-context-menu="server-archive"
+                        className={cn(
+                          "group flex items-center justify-between gap-2 rounded-lg border border-border/60 bg-muted/20 px-2 py-1.5 text-sm text-muted-foreground",
+                          centerView === "server" && selectedId === s.id && "bg-accent/30 text-foreground"
+                        )}
+                        onContextMenu={(e: React.MouseEvent) => {
+                          e.preventDefault();
+                          setContextMenu({ x: e.clientX, y: e.clientY, server: s });
+                        }}
+                        onClick={() => {
+                          setSelectedId(s.id);
+                          setCenterView("server");
+                        }}
+                      >
+                        <span className="min-w-0 flex-1 truncate">{s.name}</span>
+                        <div className="flex shrink-0 items-center gap-0.5">
+                          <Button
+                            size="icon"
+                            variant="ghost"
+                            className="h-6 w-6 text-muted-foreground hover:text-foreground"
+                            onClick={(e) => { e.stopPropagation(); requestUnarchiveServer(s); }}
+                            disabled={isDeleting}
+                            title={t("servers.contextUnarchive")}
+                          >
+                            <ArchiveRestore className="h-3 w-3" />
+                          </Button>
+                          <Button
+                            size="icon"
+                            variant="ghost"
+                            className="h-6 w-6 text-muted-foreground hover:text-destructive"
+                            onClick={(e) => { e.stopPropagation(); requestDeleteServer(s); }}
+                            disabled={isDeleting}
+                            title={t("servers.contextMoveToTrash")}
+                          >
+                            <Trash2 className="h-3 w-3" />
+                          </Button>
+                        </div>
+                      </motion.li>
+                    ))}
+                  </ul>
+                )}
+              </div>
+            )}
+            {trashedServers.length > 0 && (
+              <div className="mt-auto shrink-0 border-t border-border/60 p-2">
+                <button
+                  type="button"
+                  className="flex w-full items-center justify-end gap-2 rounded px-2 py-1 text-right text-[11px] font-medium text-muted-foreground/80 hover:text-muted-foreground hover:bg-muted/40 transition-colors"
+                  onClick={() => setTrashExpanded((x) => !x)}
+                  title={t("servers.trashSection")}
+                >
+                  {trashExpanded ? <ChevronDown className="h-3 w-3 shrink-0" /> : <ChevronRight className="h-3 w-3 shrink-0" />}
+                  <Trash2 className="h-3 w-3 shrink-0 opacity-70" />
+                  <span className="truncate">{t("servers.trashSection")} ({trashedServers.length})</span>
+                  </button>
+                  {trashExpanded && (
+                    <ul className="mt-2 space-y-1">
+                      {trashedServers.map((s) => (
+                        <motion.li
+                          key={s.id}
+                          initial={{ opacity: 0 }}
+                          animate={{ opacity: 1 }}
+                          exit={{ opacity: 0 }}
+                          data-context-menu="server-trash"
+                          className={cn(
+                            "group flex items-center justify-between gap-2 rounded-lg border border-border/60 bg-muted/30 px-2 py-1.5 text-sm text-muted-foreground",
+                            centerView === "server" && selectedId === s.id && "bg-accent/30 text-foreground"
+                          )}
+                          onContextMenu={(e: React.MouseEvent) => {
+                            e.preventDefault();
+                            setContextMenu({ x: e.clientX, y: e.clientY, server: s });
+                          }}
+                          onClick={() => {
+                            setSelectedId(s.id);
+                            setCenterView("server");
+                          }}
+                        >
+                          <span className="min-w-0 flex-1 truncate">{s.name}</span>
+                          <div className="flex shrink-0 items-center gap-0.5">
+                            <Button
+                              size="icon"
+                              variant="ghost"
+                              className="h-6 w-6 text-muted-foreground hover:text-foreground"
+                              onClick={(e) => { e.stopPropagation(); requestRestoreServer(s); }}
+                              disabled={isDeleting}
+                              title={t("servers.contextRestore")}
+                            >
+                              <RotateCcw className="h-3 w-3" />
+                            </Button>
+                            <Button
+                              size="icon"
+                              variant="ghost"
+                              className="h-6 w-6 text-muted-foreground hover:text-destructive"
+                              onClick={(e) => { e.stopPropagation(); requestDeleteServer(s); }}
+                              disabled={isDeleting}
+                              title={t("servers.permanentDeleteConfirmButton")}
+                            >
+                              <Trash2 className="h-3 w-3" />
+                            </Button>
+                          </div>
+                        </motion.li>
+                      ))}
+                    </ul>
+                  )}
+                </div>
+              )}
           </>
         )}
       </aside>
@@ -664,30 +915,63 @@ export function ServerList({
             className="fixed z-50 min-w-[180px] rounded-lg border border-border bg-card text-card-foreground py-1 shadow-xl backdrop-blur-sm"
             style={{ left: contextMenu.x, top: contextMenu.y }}
           >
-            <button type="button" className="flex w-full items-center gap-2 px-3 py-1.5 text-left text-sm text-card-foreground hover:bg-accent hover:text-accent-foreground transition-colors" onClick={() => { openServerFolder(contextMenu.server.id); setContextMenu(null); }}>
-              <FolderOpen className="h-3.5 w-3.5 shrink-0" /> {t("servers.contextOpenFolder")}
-            </button>
-            <button type="button" className="flex w-full items-center gap-2 px-3 py-1.5 text-left text-sm text-card-foreground hover:bg-accent hover:text-accent-foreground transition-colors" onClick={() => { setEditingServerId(contextMenu.server.id); setContextMenu(null); }}>
-              <Pencil className="h-3.5 w-3.5 shrink-0" /> {t("servers.contextRename")}
-            </button>
-            {runningId === contextMenu.server.id ? (
-              <button type="button" className="flex w-full items-center gap-2 px-3 py-1.5 text-left text-sm text-card-foreground hover:bg-accent hover:text-accent-foreground transition-colors" onClick={() => { stop(); setContextMenu(null); }}>
-                <Square className="h-3.5 w-3.5 shrink-0" /> {t("servers.contextStop")}
-              </button>
+            {contextMenu.server.trashed_at ? (
+              <>
+                <button type="button" className="flex w-full items-center gap-2 px-3 py-1.5 text-left text-sm text-card-foreground hover:bg-accent hover:text-accent-foreground transition-colors" onClick={() => { openServerFolder(contextMenu.server.id); setContextMenu(null); }}>
+                  <FolderOpen className="h-3.5 w-3.5 shrink-0" /> {t("servers.contextOpenFolder")}
+                </button>
+                <div className="my-1 border-t border-border" />
+                <button type="button" className="flex w-full items-center gap-2 px-3 py-1.5 text-left text-sm text-primary hover:bg-accent hover:text-accent-foreground transition-colors disabled:opacity-50" disabled={isDeleting} onClick={() => { requestRestoreServer(contextMenu.server); setContextMenu(null); }}>
+                  <RotateCcw className="h-3.5 w-3.5 shrink-0" /> {t("servers.contextRestore")}
+                </button>
+                <button type="button" className="flex w-full items-center gap-2 px-3 py-1.5 text-left text-sm text-destructive hover:bg-destructive/10 hover:text-destructive transition-colors disabled:opacity-50" disabled={isDeleting} onClick={() => { requestDeleteServer(contextMenu.server); setContextMenu(null); }}>
+                  <Trash2 className="h-3.5 w-3.5 shrink-0" /> {t("servers.permanentDeleteConfirmButton")}
+                </button>
+              </>
+            ) : contextMenu.server.archived ? (
+              <>
+                <button type="button" className="flex w-full items-center gap-2 px-3 py-1.5 text-left text-sm text-card-foreground hover:bg-accent hover:text-accent-foreground transition-colors" onClick={() => { openServerFolder(contextMenu.server.id); setContextMenu(null); }}>
+                  <FolderOpen className="h-3.5 w-3.5 shrink-0" /> {t("servers.contextOpenFolder")}
+                </button>
+                <div className="my-1 border-t border-border" />
+                <button type="button" className="flex w-full items-center gap-2 px-3 py-1.5 text-left text-sm text-primary hover:bg-accent hover:text-accent-foreground transition-colors disabled:opacity-50" disabled={isDeleting} onClick={() => { requestUnarchiveServer(contextMenu.server); setContextMenu(null); }}>
+                  <ArchiveRestore className="h-3.5 w-3.5 shrink-0" /> {t("servers.contextUnarchive")}
+                </button>
+                <button type="button" className="flex w-full items-center gap-2 px-3 py-1.5 text-left text-sm text-destructive hover:bg-destructive/10 hover:text-destructive transition-colors disabled:opacity-50" disabled={isDeleting} onClick={() => requestDeleteServer(contextMenu.server)}>
+                  <Trash2 className="h-3.5 w-3.5 shrink-0" /> {t("servers.contextMoveToTrash")}
+                </button>
+              </>
             ) : (
-              <button type="button" className="flex w-full items-center gap-2 px-3 py-1.5 text-left text-sm text-card-foreground hover:bg-accent hover:text-accent-foreground transition-colors disabled:opacity-50" disabled={isRunning} onClick={() => { start(contextMenu.server); setContextMenu(null); }}>
-                <Play className="h-3.5 w-3.5 shrink-0" /> {t("servers.contextStart")}
-              </button>
+              <>
+                <button type="button" className="flex w-full items-center gap-2 px-3 py-1.5 text-left text-sm text-card-foreground hover:bg-accent hover:text-accent-foreground transition-colors" onClick={() => { openServerFolder(contextMenu.server.id); setContextMenu(null); }}>
+                  <FolderOpen className="h-3.5 w-3.5 shrink-0" /> {t("servers.contextOpenFolder")}
+                </button>
+                <button type="button" className="flex w-full items-center gap-2 px-3 py-1.5 text-left text-sm text-card-foreground hover:bg-accent hover:text-accent-foreground transition-colors" onClick={() => { setEditingServerId(contextMenu.server.id); setContextMenu(null); }}>
+                  <Pencil className="h-3.5 w-3.5 shrink-0" /> {t("servers.contextRename")}
+                </button>
+                {runningId === contextMenu.server.id ? (
+                  <button type="button" className="flex w-full items-center gap-2 px-3 py-1.5 text-left text-sm text-card-foreground hover:bg-accent hover:text-accent-foreground transition-colors" onClick={() => { stop(); setContextMenu(null); }}>
+                    <Square className="h-3.5 w-3.5 shrink-0" /> {t("servers.contextStop")}
+                  </button>
+                ) : (
+                  <button type="button" className="flex w-full items-center gap-2 px-3 py-1.5 text-left text-sm text-card-foreground hover:bg-accent hover:text-accent-foreground transition-colors disabled:opacity-50" disabled={isRunning} onClick={() => { start(contextMenu.server); setContextMenu(null); }}>
+                    <Play className="h-3.5 w-3.5 shrink-0" /> {t("servers.contextStart")}
+                  </button>
+                )}
+                <div className="my-1 border-t border-border" />
+                <button type="button" className="flex w-full items-center gap-2 px-3 py-1.5 text-left text-sm text-card-foreground hover:bg-accent hover:text-accent-foreground transition-colors disabled:opacity-50" disabled={runningId === contextMenu.server.id} onClick={() => { requestArchiveServer(contextMenu.server); setContextMenu(null); }}>
+                  <Archive className="h-3.5 w-3.5 shrink-0" /> {t("servers.contextArchive")}
+                </button>
+                <button type="button" className="flex w-full items-center gap-2 px-3 py-1.5 text-left text-sm text-destructive hover:bg-destructive/10 hover:text-destructive transition-colors disabled:opacity-50" disabled={runningId === contextMenu.server.id} onClick={() => requestDeleteServer(contextMenu.server)}>
+                  <Trash2 className="h-3.5 w-3.5 shrink-0" /> {t("servers.contextMoveToTrash")}
+                </button>
+              </>
             )}
-            <div className="my-1 border-t border-border" />
-            <button type="button" className="flex w-full items-center gap-2 px-3 py-1.5 text-left text-sm text-destructive hover:bg-destructive/10 hover:text-destructive transition-colors disabled:opacity-50" disabled={runningId === contextMenu.server.id} onClick={() => requestDeleteServer(contextMenu.server)}>
-              <Trash2 className="h-3.5 w-3.5 shrink-0" /> {t("servers.contextDelete")}
-            </button>
           </div>,
           document.body
         )}
 
-      {/* Delete server confirmation */}
+      {/* Delete / trash server confirmation */}
       {serverToDelete &&
         createPortal(
           <div
@@ -707,15 +991,25 @@ export function ServerList({
             >
               <div className="p-6 space-y-4">
                 <div className="flex items-start gap-3">
-                  <div className="flex h-10 w-10 shrink-0 items-center justify-center rounded-full bg-destructive/15">
-                    <Trash2 className="h-5 w-5 text-destructive" />
+                  <div className={cn(
+                    "flex h-10 w-10 shrink-0 items-center justify-center rounded-full",
+                    serverToDelete.trashed_at ? "bg-destructive/15" : "bg-amber-500/15"
+                  )}>
+                    <Trash2 className={cn(
+                      "h-5 w-5",
+                      serverToDelete.trashed_at ? "text-destructive" : "text-amber-600 dark:text-amber-400"
+                    )} />
                   </div>
                   <div className="flex-1 min-w-0">
                     <h3 id="delete-server-title" className="text-lg font-semibold text-foreground">
-                      {t("servers.deleteConfirmTitle")}
+                      {serverToDelete.trashed_at
+                        ? t("servers.permanentDeleteConfirmTitle")
+                        : t("servers.trashConfirmTitle")}
                     </h3>
                     <p id="delete-server-desc" className="mt-1 text-sm text-muted-foreground">
-                      {t("servers.deleteConfirmMessage", { name: serverToDelete.name })}
+                      {serverToDelete.trashed_at
+                        ? t("servers.permanentDeleteConfirmMessage", { name: serverToDelete.name })
+                        : t("servers.trashConfirmMessage", { name: serverToDelete.name })}
                     </p>
                   </div>
                 </div>
@@ -730,17 +1024,24 @@ export function ServerList({
                   </button>
                   <button
                     type="button"
-                    onClick={confirmDeleteServer}
+                    onClick={serverToDelete.trashed_at ? confirmDeleteServer : confirmTrashServer}
                     disabled={isDeleting}
-                    className="px-4 py-2.5 rounded-lg text-sm font-medium bg-destructive text-destructive-foreground hover:bg-destructive/90 transition-colors disabled:opacity-50 inline-flex items-center justify-center gap-2 min-w-[7rem]"
+                    className={cn(
+                      "px-4 py-2.5 rounded-lg text-sm font-medium inline-flex items-center justify-center gap-2 min-w-[7rem] transition-colors disabled:opacity-50",
+                      serverToDelete.trashed_at
+                        ? "bg-destructive text-destructive-foreground hover:bg-destructive/90"
+                        : "bg-amber-600 text-white hover:bg-amber-600/90 dark:bg-amber-500 dark:hover:bg-amber-500/90"
+                    )}
                   >
                     {isDeleting ? (
                       <>
                         <Loader2 className="h-4 w-4 animate-spin" />
-                        {t("servers.deleting")}
+                        {serverToDelete.trashed_at ? t("servers.deleting") : t("servers.trashTrashing")}
                       </>
                     ) : (
-                      t("servers.deleteConfirmButton")
+                      serverToDelete.trashed_at
+                        ? t("servers.permanentDeleteConfirmButton")
+                        : t("servers.trashConfirmButton")
                     )}
                   </button>
                 </div>
@@ -2164,15 +2465,27 @@ function ServerOverview({
         if (step === "preparing" || step === "downloading" || step === "connecting") onSetTunnelStatus(step);
       });
       try {
-        const frp = getFrpPrefs();
-        const relayToken = await getRelayTokenForTunnel(getToken());
-        const token = relayToken || frp.token;
-        if (!token) {
-          onSetTunnelError(t("servers.shareSignInRequired"));
-          return;
+        const authToken = getToken();
+        let frpConfig: { apiBaseUrl: string; serverAddr: string; serverPort: number; token: string };
+        try {
+          const config = await api.getRelayConfig(authToken ?? "");
+          if (config?.apiBaseUrl && config?.token) {
+            frpConfig = { apiBaseUrl: config.apiBaseUrl, serverAddr: config.serverAddr, serverPort: config.serverPort, token: config.token };
+          } else {
+            throw new Error("no config");
+          }
+        } catch {
+          const frp = getFrpPrefs();
+          const relayToken = await getRelayTokenForTunnel(authToken);
+          const token = relayToken || frp.token;
+          if (!token) {
+            onSetTunnelError(t("servers.shareSignInRequired"));
+            return;
+          }
+          frpConfig = { apiBaseUrl: frp.apiBaseUrl, serverAddr: frp.serverAddr, serverPort: frp.serverPort, token };
         }
         const url = await Promise.race([
-          invoke<string>("start_tunnel", { port: s.port, method: "frp", frpConfig: { apiBaseUrl: frp.apiBaseUrl, serverAddr: frp.serverAddr, serverPort: frp.serverPort, token } }),
+          invoke<string>("start_tunnel", { port: s.port, method: "frp", frpConfig }),
           new Promise<string>((_, reject) => setTimeout(() => reject(new Error(t("servers.shareTimeout"))), 120_000)),
         ]);
         onSetTunnelUrl(url);

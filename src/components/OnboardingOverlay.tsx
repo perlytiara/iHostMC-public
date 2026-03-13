@@ -7,6 +7,13 @@ import { ArrowRight, X, Sparkles } from "lucide-react";
 
 const STORAGE_KEY = "ihostmc-onboarding-complete";
 
+export interface OnboardingOverlayProps {
+  /** When true, overlay is hidden (e.g. already completed). */
+  completed?: boolean;
+  /** Called when user completes or skips onboarding. Parent can persist and use to e.g. allow update dialog. */
+  onComplete?: () => void;
+}
+
 const steps = [
   { titleKey: "onboarding.welcomeTitle", descKey: "onboarding.welcomeDesc" },
   { titleKey: "onboarding.navTitle", descKey: "onboarding.navDesc" },
@@ -15,22 +22,29 @@ const steps = [
   { titleKey: "onboarding.readyTitle", descKey: "onboarding.readyDesc" },
 ];
 
-export function OnboardingOverlay() {
+export function OnboardingOverlay({ completed = false, onComplete }: OnboardingOverlayProps = {}) {
   const { t } = useTranslation();
   const [show, setShow] = useState(false);
   const [step, setStep] = useState(0);
 
   useEffect(() => {
+    if (completed) {
+      setShow(false);
+      return;
+    }
     try {
       if (!localStorage.getItem(STORAGE_KEY)) {
         setShow(true);
       }
     } catch {}
-  }, []);
+  }, [completed]);
 
   const complete = () => {
     setShow(false);
-    try { localStorage.setItem(STORAGE_KEY, "1"); } catch {}
+    try {
+      localStorage.setItem(STORAGE_KEY, "1");
+    } catch {}
+    onComplete?.();
   };
 
   const next = () => {
@@ -38,7 +52,7 @@ export function OnboardingOverlay() {
     else complete();
   };
 
-  if (!show) return null;
+  if (completed || !show) return null;
 
   return (
     <AnimatePresence>

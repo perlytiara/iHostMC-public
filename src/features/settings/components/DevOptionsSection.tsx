@@ -7,7 +7,7 @@ import { api } from "@/lib/api-client";
 import { useAuthStore } from "@/features/auth";
 import { cn } from "@/lib/utils";
 import { toast } from "@/lib/toast-store";
-import { SettingsNavContext } from "@/App";
+import { SettingsNavContext, DeveloperMenuContext } from "@/App";
 import {
   getDevStorageSimulateFull,
   setDevStorageSimulateFull,
@@ -27,6 +27,7 @@ export function DevOptionsSection() {
   const { t } = useTranslation();
   const user = useAuthStore((s) => s.user);
   const { settingsAsIcon, setSettingsAsIcon } = useContext(SettingsNavContext);
+  const { developerMenuEnabled, setDeveloperMenuEnabled } = useContext(DeveloperMenuContext);
   const [canUseDevOverride, setCanUseDevOverride] = useState(false);
   const [stripeTestMode, setStripeTestMode] = useState(false);
   const [stripeModeLoading, setStripeModeLoading] = useState(false);
@@ -112,14 +113,6 @@ export function DevOptionsSection() {
     toast.info(t("settings.dev.secretCleared"));
   }, [t]);
 
-  if (!user) {
-    return (
-      <div className="rounded-2xl border-2 border-amber-500/40 bg-amber-500/5 p-6">
-        <p className="text-sm text-muted-foreground">{t("settings.dev.signInRequired")}</p>
-      </div>
-    );
-  }
-
   const handleSettingsAsIconToggle = useCallback(() => {
     const next = !settingsAsIcon;
     setSettingsAsIcon(next);
@@ -133,8 +126,46 @@ export function DevOptionsSection() {
           {t("settings.dev.intro")}
         </p>
 
-        {/* Settings as icon in navbar (dev build only) */}
-        {import.meta.env.DEV && (
+        {/* Show Developer / Debug menu – for all users */}
+        <div>
+          <h4 className="text-base font-semibold text-foreground mb-1">
+            {t("settings.dev.showDeveloperMenu", { defaultValue: "Show Developer menu" })}
+          </h4>
+          <p className="text-sm text-muted-foreground mb-3">
+            {t("settings.dev.showDeveloperMenuDesc", {
+              defaultValue: "When on, the Developer menu appears in the app menu (☰) and under Help. Use it to open the Dev tools panel, refresh, or open the Developer page.",
+            })}
+          </p>
+          <div className="flex items-center gap-3">
+            <button
+              type="button"
+              role="switch"
+              aria-checked={developerMenuEnabled}
+              onClick={() => {
+                const next = !developerMenuEnabled;
+                setDeveloperMenuEnabled(next);
+                toast.info(next ? t("settings.dev.developerMenuOn", { defaultValue: "Developer menu enabled" }) : t("settings.dev.developerMenuOff", { defaultValue: "Developer menu disabled" }));
+              }}
+              className={cn(
+                "relative inline-flex h-6 w-11 shrink-0 cursor-pointer rounded-full border-2 border-transparent transition-colors focus:outline-none focus:ring-2 focus:ring-primary focus:ring-offset-2",
+                developerMenuEnabled ? "bg-primary" : "bg-muted"
+              )}
+            >
+              <span
+                className={cn(
+                  "pointer-events-none inline-block h-5 w-5 transform rounded-full bg-primary-foreground shadow ring-0 transition",
+                  developerMenuEnabled ? "translate-x-5" : "translate-x-1"
+                )}
+              />
+            </button>
+            <span className="text-sm font-medium">
+              {developerMenuEnabled ? t("common.on", { defaultValue: "On" }) : t("common.off", { defaultValue: "Off" })}
+            </span>
+          </div>
+        </div>
+
+        {/* Settings as icon – only with override */}
+        {canUseDevOverride && (
           <div>
             <h4 className="text-base font-semibold text-foreground mb-1">{t("settings.dev.settingsAsIcon", { defaultValue: "Settings as icon (right side of navbar)" })}</h4>
             <p className="text-sm text-muted-foreground mb-3">{t("settings.dev.settingsAsIconDesc", { defaultValue: "When on, Settings appears as a gear icon on the right of the top bar instead of a tab. When off, Settings is a tab in the main nav." })}</p>
@@ -161,7 +192,8 @@ export function DevOptionsSection() {
           </div>
         )}
 
-        {/* Stripe Live / Test */}
+        {/* Stripe Live / Test – only with override */}
+        {canUseDevOverride && (
         <div>
           <h4 className="text-base font-semibold text-foreground mb-1">{t("settings.dev.stripeMode")}</h4>
           <p className="text-sm text-muted-foreground mb-3">{t("settings.dev.stripeModeDesc")}</p>
@@ -190,8 +222,9 @@ export function DevOptionsSection() {
             {stripeModeLoading && <span className="text-xs text-muted-foreground">…</span>}
           </div>
         </div>
+        )}
 
-        {/* Dev tier override */}
+        {/* Dev tier override – only with override */}
         {canUseDevOverride && (
           <div>
             <h4 className="text-base font-semibold text-foreground mb-1">{t("settings.dev.switchTier")}</h4>
@@ -235,12 +268,15 @@ export function DevOptionsSection() {
           </div>
         )}
 
-        {!canUseDevOverride && (
+        {!user && (
+          <p className="text-sm text-muted-foreground">{t("settings.dev.signInRequired")}</p>
+        )}
+        {user && !canUseDevOverride && (
           <p className="text-sm text-muted-foreground">{t("settings.dev.overrideNotAllowed")}</p>
         )}
 
-        {/* Simulate storage almost full (dev only) */}
-        {import.meta.env.DEV && (
+        {/* Simulate storage almost full – only with override */}
+        {canUseDevOverride && (
           <div>
             <h4 className="text-base font-semibold text-foreground mb-1">
               {t("settings.dev.simulateStorageFull")}
@@ -278,8 +314,8 @@ export function DevOptionsSection() {
           </div>
         )}
 
-        {/* Unlimited usage (dev only) */}
-        {import.meta.env.DEV && (
+        {/* Unlimited usage – only with override */}
+        {canUseDevOverride && (
           <div>
             <h4 className="text-base font-semibold text-foreground mb-1">
               {t("settings.dev.unlimitedUsage")}

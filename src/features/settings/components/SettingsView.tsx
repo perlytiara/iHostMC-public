@@ -27,6 +27,7 @@ import { AccountSection } from "./AccountSection";
 import { BackupSyncSection } from "./BackupSyncSection";
 import { DevOptionsSection } from "./DevOptionsSection";
 import { cn } from "@/lib/utils";
+import { APP_VERSION } from "@/lib/version.generated";
 import { useCallback, useEffect, useRef, useState } from "react";
 import { useTranslation } from "react-i18next";
 import { invoke } from "@tauri-apps/api/core";
@@ -59,10 +60,10 @@ const BASE_TABS: { id: SettingsTab; icon: typeof Settings; labelKey: string }[] 
   { id: "about", icon: Info, labelKey: "settings.about" },
 ];
 
-const tabs: { id: SettingsTab; icon: typeof Settings; labelKey: string }[] =
-  import.meta.env.DEV
-    ? [...BASE_TABS, { id: "developer" as const, icon: Code2, labelKey: "settings.developer" }]
-    : BASE_TABS;
+const tabs: { id: SettingsTab; icon: typeof Settings; labelKey: string }[] = [
+  ...BASE_TABS,
+  { id: "developer" as const, icon: Code2, labelKey: "settings.developer" },
+];
 
 interface SettingsViewProps {
   onClose?: () => void;
@@ -271,8 +272,8 @@ export function SettingsView({ onClose, onEnsureAccountVisible, runInBackground 
               <BackupSyncSection />
             </motion.div>
           )}
-          {activeTab === "developer" && import.meta.env.DEV && (
-            <motion.div initial={{ opacity: 1, y: 4 }} animate={{ opacity: 1, y: 0 }} className="space-y-6">
+          {activeTab === "developer" && (
+            <motion.div initial={{ opacity: 0, y: 4 }} animate={{ opacity: 1, y: 0 }} className="space-y-6">
               <div>
                 <h3 className="text-lg font-bold">{t("settings.developer")}</h3>
                 <p className="text-sm text-muted-foreground mt-0.5">{t("settings.dev.tabDesc")}</p>
@@ -486,7 +487,7 @@ export function SettingsView({ onClose, onEnsureAccountVisible, runInBackground 
                   <AppLogo size={72} />
                   <div>
                     <p className="text-sm font-bold">iHostMC</p>
-                    <p className="text-xs text-muted-foreground">{t("common.version")}</p>
+                    <p className="text-xs text-muted-foreground">v{APP_VERSION}</p>
                   </div>
                 </div>
                 <p className="text-xs text-muted-foreground">{t("settings.aboutDesc")}</p>

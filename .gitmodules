@@ -1,9 +1,0 @@
-[submodule "submodules/altoclef"]
-	path = submodules/altoclef
-	url = https://github.com/gaucho-matrero/altoclef.git
-[submodule "submodules/baritone"]
-	path = submodules/baritone
-	url = https://github.com/cabaletta/baritone.git
-[submodule "submodules/autoclef"]
-	path = submodules/autoclef
-	url = https://github.com/3ndetz/autoclef.git

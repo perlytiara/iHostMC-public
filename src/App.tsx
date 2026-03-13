@@ -9,13 +9,14 @@ import { AppContextMenu } from "@/components/AppContextMenu";
 import { Toaster } from "@/components/Toaster";
 import { LoadingScreen } from "@/components/LoadingScreen";
 import { OnboardingOverlay } from "@/components/OnboardingOverlay";
+import { UpdateAvailableDialog } from "@/components/UpdateAvailableDialog";
 import { useDevMenuShortcut } from "@/hooks/useDevMenuShortcut";
 import { useInspectShortcut } from "@/hooks/useInspectShortcut";
 import { useDeepLinkAuth } from "@/features/auth/hooks/useDeepLinkAuth";
 import { useAuthStore } from "@/features/auth";
 import { AccountDataProvider } from "@/contexts/AccountDataContext";
 import { isTauri } from "@/lib/utils";
-import { api, isBackendConfigured } from "@/lib/api-client";
+import { api, isBackendConfigured, setOnAuthExpired } from "@/lib/api-client";
 import { getFrpPrefs, setFrpPrefs } from "@/lib/tunnel-prefs";
 import { initServerOutputStore } from "@/lib/server-output-store";
 import { getCurrentWindow } from "@tauri-apps/api/window";
@@ -69,6 +70,19 @@ export interface SettingsNavContextValue {
 export const SettingsNavContext = createContext<SettingsNavContextValue>({
   settingsAsIcon: false,
   setSettingsAsIcon: () => {},
+});
+
+const DEVELOPER_MENU_KEY = "ihostmc-developer-menu-enabled";
+const ONBOARDING_COMPLETE_KEY = "ihostmc-onboarding-complete";
+
+export interface DeveloperMenuContextValue {
+  developerMenuEnabled: boolean;
+  setDeveloperMenuEnabled: (enabled: boolean) => void;
+}
+
+export const DeveloperMenuContext = createContext<DeveloperMenuContextValue>({
+  developerMenuEnabled: false,
+  setDeveloperMenuEnabled: () => {},
 });
 
 export interface MenuBarServerContext {
@@ -130,7 +144,7 @@ function getStoredPage(): AppPage {
   if (typeof window === "undefined") return "home";
   const saved = localStorage.getItem(PAGE_STORAGE_KEY) as AppPage | null;
   if (saved === "home" || saved === "servers" || saved === "storage" || saved === "ai" || saved === "settings") return saved;
-  if (saved === "dev" && import.meta.env.DEV && import.meta.env.VITE_PUBLIC_REPO !== "true") return "dev";
+  if (saved === "dev" && import.meta.env.DEV) return "dev";
   return "home";
 }
 
@@ -145,17 +159,42 @@ function AppContent() {
   const [runInBackground, setRunInBackground] = useState(true);
   const [testControlUrl, setTestControlUrl] = useState<string | null>(null);
   const [updateAvailable, setUpdateAvailable] = useState<{ version: string; body: string | null } | null>(null);
+  const [updateDialogDismissed, setUpdateDialogDismissed] = useState(false);
   const [downloading, setDownloading] = useState(false);
+  const [updateProgress, setUpdateProgress] = useState<{ downloaded: number; total: number } | null>(null);
+  const [updatePhase, setUpdatePhase] = useState<"idle" | "downloading" | "installing" | "restarting" | "error">("idle");
+  const [updateError, setUpdateError] = useState<string | null>(null);
   const [serverCount, setServerCount] = useState(0);
   const [runningCount, setRunningCount] = useState(0);
   const [closeConfirm, setCloseConfirm] = useState<{ runningCount: number } | null>(null);
   const [initialSettingsTab, setInitialSettingsTab] = useState<"general" | "account" | null>(null);
+  const [onboardingComplete, setOnboardingCompleteState] = useState(() =>
+    typeof window !== "undefined" && !!localStorage.getItem(ONBOARDING_COMPLETE_KEY)
+  );
+  const [developerMenuEnabled, setDeveloperMenuEnabledState] = useState(() =>
+    typeof window !== "undefined" && localStorage.getItem(DEVELOPER_MENU_KEY) === "true"
+  );
 
   const user = useAuthStore((s) => s.user);
   const prevUserRef = useRef<typeof user | undefined>(undefined);
-  useDevMenuShortcut(() => setDevMenuOpen(true));
-  useInspectShortcut();
+
+  const setDeveloperMenuEnabled = useCallback((enabled: boolean) => {
+    setDeveloperMenuEnabledState(enabled);
+    try {
+      if (enabled) localStorage.setItem(DEVELOPER_MENU_KEY, "true");
+      else localStorage.removeItem(DEVELOPER_MENU_KEY);
+    } catch {}
+  }, []);
+
+  useDevMenuShortcut(() => setDevMenuOpen(true), { enabled: developerMenuEnabled });
+  useInspectShortcut({ enabled: developerMenuEnabled });
   useDeepLinkAuth();
+
+  // When any API returns 401, automatically clear auth so user sees connect screen and can re-sign in via browser
+  useEffect(() => {
+    setOnAuthExpired(() => useAuthStore.getState().logout());
+    return () => setOnAuthExpired(null);
+  }, []);
 
   // Restore stored page after first paint so we don't block on loading a heavy chunk (servers/storage) at startup
   useEffect(() => {
@@ -239,7 +278,10 @@ function AppContent() {
     if (!isTauri()) return;
     check()
       .then((upd) => {
-        if (upd) setUpdateAvailable({ version: upd.version, body: upd.body ?? null });
+        if (upd) {
+          setUpdateAvailable({ version: upd.version, body: upd.body ?? null });
+          setUpdateDialogDismissed(false); // show dialog for new update
+        }
       })
       .catch(() => {});
   }, []);
@@ -257,18 +299,58 @@ function AppContent() {
 
   const handleInstallUpdate = useCallback(async () => {
     if (!updateAvailable || downloading) return;
+    setUpdateError(null);
     setDownloading(true);
+    setUpdatePhase("downloading");
+    setUpdateProgress({ downloaded: 0, total: 0 });
     try {
       const upd = await check();
-      if (!upd) return;
-      await upd.downloadAndInstall((event) => {
-        if (event.event === "Finished") setDownloading(false);
-      });
-      await relaunch();
-    } catch {
+      if (!upd) {
+        setDownloading(false);
+        setUpdateProgress(null);
+        setUpdatePhase("error");
+        setUpdateError("No update available. Please try again.");
+        return;
+      }
+      type DownloadEventData = { contentLength?: number; chunkLength?: number; content_length?: number; chunk_length?: number };
+      const onProgress = (event: { event?: string; data?: DownloadEventData }) => {
+        try {
+          const ev = String((event as { event?: string })?.event ?? "").toLowerCase();
+          const data = event?.data;
+          const total = data?.contentLength ?? data?.content_length;
+          const chunk = data?.chunkLength ?? data?.chunk_length;
+          if ((ev === "started") && total != null) {
+            setUpdateProgress((p) => ({ downloaded: p?.downloaded ?? 0, total }));
+          } else if (ev === "progress" && chunk != null) {
+            setUpdateProgress((p) =>
+              p ? { ...p, downloaded: p.downloaded + chunk } : { downloaded: chunk, total: 0 }
+            );
+          } else if (ev === "finished") {
+            setUpdatePhase("installing");
+            setUpdateProgress(null);
+          }
+        } catch {
+          // ignore bad progress events
+        }
+      };
+      await upd.download(onProgress);
       setDownloading(false);
+      setUpdatePhase("installing");
+      setUpdateProgress(null);
+      await upd.install();
+      setUpdatePhase("restarting");
+      await relaunch();
+    } catch (err) {
+      const message = err instanceof Error ? err.message : String(err);
+      setUpdateError(message || "Update failed. Try again or download from the website.");
+      setDownloading(false);
+      setUpdateProgress(null);
+      setUpdatePhase("error");
     }
   }, [updateAvailable, downloading]);
+
+  const showUpdateDialog =
+    !!updateAvailable && !updateDialogDismissed && isTauri() && onboardingComplete;
 
   const handleExit = useCallback(() => {
     if (isTauri()) {
@@ -320,6 +402,7 @@ function AppContent() {
 
   return (
     <SettingsNavContext.Provider value={{ settingsAsIcon, setSettingsAsIcon }}>
+    <DeveloperMenuContext.Provider value={{ developerMenuEnabled, setDeveloperMenuEnabled }}>
     <div className="flex min-h-0 min-w-0 flex-1 flex-col w-full bg-background text-foreground">
       <CustomTitleBar
         currentPage={currentPage}
@@ -337,18 +420,19 @@ function AppContent() {
         isDownloadingUpdate={downloading}
       />
 
-      {updateAvailable && (
-        <div className="flex items-center justify-center gap-2 border-b border-emerald-500/30 bg-emerald-500/10 px-6 py-1.5 text-xs text-emerald-800 dark:text-emerald-300">
-          <span>{t("header.updateAvailable", { version: updateAvailable.version })}</span>
-          <button
-            type="button"
-            onClick={handleInstallUpdate}
-            disabled={downloading}
-            className="rounded-md border border-border bg-background px-2.5 py-1 text-xs hover:bg-accent transition-colors"
-          >
-            {downloading ? t("header.downloading") : t("header.install")}
-          </button>
-        </div>
+      {updateAvailable && isTauri() && (
+        <UpdateAvailableDialog
+          open={showUpdateDialog}
+          onOpenChange={(open) => !open && !downloading && setUpdateDialogDismissed(true)}
+          update={updateAvailable}
+          onInstall={handleInstallUpdate}
+          onLater={() => setUpdateDialogDismissed(true)}
+          isDownloading={downloading}
+          progress={updateProgress}
+          phase={updatePhase}
+          error={updateError}
+          onRetry={() => { setUpdateError(null); setUpdatePhase("idle"); handleInstallUpdate(); }}
+        />
       )}
 
       {testControlUrl && (
@@ -420,7 +504,7 @@ function AppContent() {
               />
             </PageTransition>
           )}
-          {currentPage === "dev" && import.meta.env.DEV && import.meta.env.VITE_PUBLIC_REPO !== "true" && (
+          {currentPage === "dev" && import.meta.env.DEV && (
             <PageTransition pageKey="dev">
               <DevPage onOpenWindowTools={() => setWindowToolsOpen(true)} />
             </PageTransition>
@@ -429,9 +513,7 @@ function AppContent() {
         </PageErrorBoundary>
       </main>
 
-      {import.meta.env.VITE_PUBLIC_REPO !== "true" && (
-        <DevMenu open={devMenuOpen} onClose={() => setDevMenuOpen(false)} />
-      )}
+      <DevMenu open={devMenuOpen} onClose={() => setDevMenuOpen(false)} />
       <WindowTools open={windowToolsOpen} onClose={() => setWindowToolsOpen(false)} />
       <AppContextMenu />
       <Toaster />
@@ -446,8 +528,17 @@ function AppContent() {
           />
         )}
       </AnimatePresence>
-      <OnboardingOverlay />
+      <OnboardingOverlay
+        completed={onboardingComplete}
+        onComplete={() => {
+          setOnboardingCompleteState(true);
+          try {
+            localStorage.setItem(ONBOARDING_COMPLETE_KEY, "1");
+          } catch {}
+        }}
+      />
     </div>
+    </DeveloperMenuContext.Provider>
     </SettingsNavContext.Provider>
   );
 }

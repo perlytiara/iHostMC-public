@@ -290,6 +290,8 @@ pub async fn create_server(app: AppHandle, config: CreateServerInput) -> Result<
         port,
         java_path: config.java_path,
         path: path.clone(),
+        archived: false,
+        trashed_at: None,
     };
     server::add_server(server_config.clone());
     Ok(server_config)
@@ -352,15 +354,69 @@ pub struct CreateServerInput {
     pub favicon_b64: Option<String>,
 }
 
-/// Deletes a server: removes it from the list, persists servers.json, and fully removes
-/// the server's data directory so no files or folders remain.
-/// Kills orphaned Java processes holding locks on the directory before deleting.
+/// Archive server (hide from active list, like AI advisor).
+#[tauri::command]
+pub fn archive_server(id: String) -> Result<(), String> {
+    if process::is_running() {
+        if process::running_server_id().as_deref() == Some(id.as_str()) {
+            return Err("Stop the running server first".to_string());
+        }
+    }
+    if server::archive_server(&id) {
+        Ok(())
+    } else {
+        Err("Server not found".to_string())
+    }
+}
+
+/// Unarchive server (restore to active list).
+#[tauri::command]
+pub fn unarchive_server(id: String) -> Result<(), String> {
+    if server::unarchive_server(&id) {
+        Ok(())
+    } else {
+        Err("Server not found".to_string())
+    }
+}
+
+/// Move server to trash (soft delete). Server stays in list with trashed_at set.
+#[tauri::command]
+pub fn trash_server(id: String) -> Result<(), String> {
+    if process::is_running() {
+        if process::running_server_id().as_deref() == Some(id.as_str()) {
+            return Err("Stop the running server first".to_string());
+        }
+    }
+    if server::trash_server(&id) {
+        Ok(())
+    } else {
+        Err("Server not found".to_string())
+    }
+}
+
+/// Restore server from trash.
+#[tauri::command]
+pub fn restore_server(id: String) -> Result<(), String> {
+    if server::restore_server(&id) {
+        Ok(())
+    } else {
+        Err("Server not found".to_string())
+    }
+}
+
+/// Permanently deletes a server: removes from list, deletes data directory.
+/// Server must be in trash first. Use trash_server to move to trash.
 #[tauri::command]
 pub fn delete_server(id: String) -> Result<(), String> {
     if process::is_running() {
         if process::running_server_id().as_deref() == Some(id.as_str()) {
             return Err("Stop the running server first".to_string());
         }
+    }
+    let cfg = server::get_server(&id);
+    let is_trashed = cfg.as_ref().and_then(|c| c.trashed_at.as_ref()).is_some();
+    if !is_trashed {
+        return Err("Move server to trash first, then permanently delete".to_string());
     }
     if server::remove_server(&id) {
         let dir = server::server_dir(&id);
@@ -481,6 +537,9 @@ pub async fn start_server(
     run_in_background: Option<bool>,
 ) -> Result<(), String> {
     let config = server::get_server(&id).ok_or("Server not found")?;
+    if config.trashed_at.is_some() {
+        return Err("Cannot start a server in trash. Restore it first.".to_string());
+    }
     let detach = run_in_background.unwrap_or(false);
 
     let emit_log = |msg: &str| {
@@ -842,13 +901,6 @@ pub fn get_system_ram_mb() -> Result<u64, String> {
     Ok(sys.available_memory() / (1024 * 1024))
 }
 
-/// Resolve Java path. Prefers Java 21+ (required for Minecraft 1.21+). Downloads if none found or all too old.
-async fn ensure_java_available(
-    server_java_path: Option<&str>,
-) -> Result<std::path::PathBuf, String> {
-    ensure_java_available_logged(server_java_path, None).await
-}
-
 async fn ensure_java_available_logged(
     server_java_path: Option<&str>,
     app: Option<&AppHandle>,
@@ -1159,9 +1211,9 @@ pub fn rename_server(id: String, new_name: String) -> Result<(), String> {
     server::rename_server(&id, &new_name)
 }
 
+/// Opens DevTools on the given window. Available in all builds when user enables Developer menu.
 #[tauri::command]
 pub fn open_devtools(window: tauri::WebviewWindow) {
-    #[cfg(debug_assertions)]
     let _ = window.open_devtools();
 }
 
@@ -1384,7 +1436,10 @@ pub fn remove_upnp_if_active() {
 #[tauri::command]
 pub fn add_windows_firewall_rule(port: u16) -> Result<(), String> {
     #[cfg(not(target_os = "windows"))]
-    return Err("Firewall rules are only supported on Windows.".to_string());
+    return Err(format!(
+        "Firewall rules are only supported on Windows (requested port {}).",
+        port
+    ));
 
     #[cfg(target_os = "windows")]
     {
@@ -1501,7 +1556,11 @@ fn classify_path(path: &str) -> FileCategory {
     if path.starts_with(CACHE_PREFIX) || path.starts_with(LOGS_PREFIX) {
         return FileCategory::Cache;
     }
-    if first == "world" || first.starts_with("world_") || first == "DIM-1" || first == "DIM1" {
+    if first == WORLD_PREFIX
+        || first.starts_with(&format!("{}_", WORLD_PREFIX))
+        || first == "DIM-1"
+        || first == "DIM1"
+    {
         return FileCategory::World;
     }
     if path == "server.properties"

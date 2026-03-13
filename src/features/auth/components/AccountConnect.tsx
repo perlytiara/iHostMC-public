@@ -2,6 +2,7 @@
 
 import { useState, useCallback, useEffect, useRef } from "react";
 import { Button } from "@/components/ui/button";
+import { Input } from "@/components/ui/input";
 import { LoadingSpinner, LoadingState } from "@/components/LoadingSpinner";
 import {
   getWebsiteUrl,
@@ -9,11 +10,12 @@ import {
   getLoginUrlWithSession,
   getApiBaseUrl,
   claimAppSession,
+  api,
 } from "@/lib/api-client";
 import { useAuthStore } from "../store/auth-store";
 import { isTauri } from "@/lib/utils";
 import { cn } from "@/lib/utils";
-import { UserPlus, LogIn } from "lucide-react";
+import { UserPlus, LogIn, ChevronDown, ChevronRight } from "lucide-react";
 import { useTranslation } from "react-i18next";
 
 const POLL_INTERVAL_MS = 2000;
@@ -36,6 +38,10 @@ export function AccountConnect({ onSuccess, compact, onBeforeLogin }: AccountCon
   const [phase, setPhase] = useState<ConnectPhase>("idle");
   const [waitingSessionId, setWaitingSessionId] = useState<string | null>(null);
   const [sessionError, setSessionError] = useState<string | null>(null);
+  const [pasteTokenExpanded, setPasteTokenExpanded] = useState(false);
+  const [pasteTokenValue, setPasteTokenValue] = useState("");
+  const [pasteTokenError, setPasteTokenError] = useState<string | null>(null);
+  const [pasteTokenLoading, setPasteTokenLoading] = useState(false);
   const pollStartedRef = useRef<number | null>(null);
 
   // When user is set (e.g. via deep link / browser sign-in handoff), parent shows account card; reset local state
@@ -117,9 +123,51 @@ export function AccountConnect({ onSuccess, compact, onBeforeLogin }: AccountCon
     }
   }, [openBrowser, apiBase]);
 
+  const handleRetrySignIn = useCallback(async () => {
+    setSessionError(null);
+    setPhase("opening");
+    try {
+      const health = await import("@/lib/api-client").then((m) => m.getHealth());
+      if (!health.ok) {
+        setPhase("error");
+        setSessionError("serverUnreachable");
+        return;
+      }
+      await handleSignInWithBrowser();
+    } catch {
+      setPhase("error");
+      setSessionError(apiBase ? "couldNotCreateLink" : "couldNotCreateLinkNoApi");
+    }
+  }, [handleSignInWithBrowser, apiBase]);
+
   const handleSignUp = useCallback(async () => {
     await openBrowser(signupUrl);
   }, [signupUrl, openBrowser]);
+
+  const handlePasteTokenConnect = useCallback(async () => {
+    const token = pasteTokenValue.trim();
+    if (!token) {
+      setPasteTokenError("pasteTokenErrorEmpty");
+      return;
+    }
+    setPasteTokenError(null);
+    setPasteTokenLoading(true);
+    try {
+      const me = await api.me(token);
+      if (me?.userId && me?.email) {
+        onBeforeLogin?.();
+        setUser({ token, userId: me.userId, email: me.email });
+        setPasteTokenValue("");
+        onSuccess?.();
+      } else {
+        setPasteTokenError("pasteTokenErrorInvalid");
+      }
+    } catch {
+      setPasteTokenError("pasteTokenErrorInvalid");
+    } finally {
+      setPasteTokenLoading(false);
+    }
+  }, [pasteTokenValue, setUser, onSuccess, onBeforeLogin]);
 
   if (!apiBase) {
     return (
@@ -169,25 +217,33 @@ export function AccountConnect({ onSuccess, compact, onBeforeLogin }: AccountCon
 
   if (phase === "error" && sessionError) {
     const isNoApi = sessionError === "couldNotCreateLinkNoApi";
+    const isUnreachable = sessionError === "serverUnreachable";
     return (
       <div className={cn("rounded-xl border-2 border-destructive/40 bg-card/50 p-6", compact && "p-4")}>
         <div className="flex flex-col items-center gap-4 text-center">
           <p className="text-sm font-medium text-destructive">
-            {t(isNoApi ? "settings.backendNotConfigured" : "settings.couldNotCreateLink")}
+            {t(isNoApi ? "settings.backendNotConfigured" : isUnreachable ? "settings.serverUnreachable" : "settings.couldNotCreateLink")}
           </p>
           <p className="text-xs text-muted-foreground max-w-sm">
             {isNoApi
               ? t("settings.websiteUrlNotSet")
-              : t("settings.couldNotCreateLinkHint")}
+              : isUnreachable
+                ? t("settings.serverUnreachableHint")
+                : t("settings.couldNotCreateLinkHint")}
           </p>
           {apiBase && (
             <p className="text-xs text-muted-foreground/80 font-mono break-all max-w-sm">
               {apiBase}
             </p>
           )}
-          <Button onClick={() => { setPhase("idle"); setSessionError(null); }}>
-            {t("common.tryAgain")}
-          </Button>
+          <div className="flex gap-2">
+            <Button onClick={handleRetrySignIn}>
+              {t("common.tryAgain")}
+            </Button>
+            <Button variant="outline" onClick={() => { setPhase("idle"); setSessionError(null); }}>
+              {t("common.back")}
+            </Button>
+          </div>
         </div>
       </div>
     );
@@ -212,6 +268,39 @@ export function AccountConnect({ onSuccess, compact, onBeforeLogin }: AccountCon
         <p className="mt-3 text-xs text-muted-foreground text-center">
           {t("settings.accountConnectFooterAuto")}
         </p>
+        {/* Optional: enter token manually (for later / fallback when browser flow fails) */}
+        <div className="mt-4 pt-4 border-t border-border">
+          <button
+            type="button"
+            onClick={() => setPasteTokenExpanded(!pasteTokenExpanded)}
+            className="flex items-center gap-1.5 text-xs text-muted-foreground hover:text-foreground"
+          >
+            {pasteTokenExpanded ? <ChevronDown className="h-4 w-4" /> : <ChevronRight className="h-4 w-4" />}
+            {t("settings.pasteTokenLabel")}
+          </button>
+          {pasteTokenExpanded && (
+            <div className="mt-3 space-y-2">
+              <p className="text-xs text-muted-foreground">{t("settings.pasteTokenHint")}</p>
+              <Input
+                value={pasteTokenValue}
+                onChange={(e) => { setPasteTokenValue(e.target.value); setPasteTokenError(null); }}
+                placeholder={t("settings.pasteTokenPlaceholder")}
+                className="font-mono text-sm"
+              />
+              {pasteTokenError && (
+                <p className="text-xs text-destructive">{t(`settings.${pasteTokenError}`)}</p>
+              )}
+              <Button
+                variant="outline"
+                size="sm"
+                onClick={handlePasteTokenConnect}
+                disabled={pasteTokenLoading}
+              >
+                {pasteTokenLoading ? t("settings.verifying") : t("settings.continue")}
+              </Button>
+            </div>
+          )}
+        </div>
       </div>
     </>
   );

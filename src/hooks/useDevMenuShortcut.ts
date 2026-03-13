@@ -2,13 +2,16 @@
 
 import { useCallback, useEffect, useRef } from "react";
 
-export function useDevMenuShortcut(onOpen: () => void) {
+export function useDevMenuShortcut(
+  onOpen: () => void,
+  options?: { enabled?: boolean }
+) {
+  const enabled = options?.enabled ?? true;
   const keysRef = useRef<Set<string>>(new Set());
 
   const handleKeyDown = useCallback(
     (e: KeyboardEvent) => {
-      if (import.meta.env.VITE_PUBLIC_REPO === "true") return;
-      if (!e.ctrlKey || !e.shiftKey) return;
+      if (!enabled || !e.ctrlKey || !e.shiftKey) return;
       const key = e.key.toLowerCase();
       if (key === "d") {
         e.preventDefault();
@@ -24,7 +27,7 @@ export function useDevMenuShortcut(onOpen: () => void) {
         }
       }
     },
-    [onOpen]
+    [onOpen, enabled]
   );
 
   const handleKeyUp = useCallback((e: KeyboardEvent) => {

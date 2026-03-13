@@ -8,11 +8,8 @@ const RAW_BASE =
     ? (import.meta.env.VITE_API_BASE_URL as string).replace(/\/$/, "")
     : "";
 
-/** Use api.ihost.one for legacy DuckDNS API host so sync/relay work (same backend, canonical domain). */
-const BASE =
-  RAW_BASE && (RAW_BASE.includes("ihostmc-api.duckdns.org") || RAW_BASE.includes("ihostmc.duckdns.org"))
-    ? "https://api.ihost.one"
-    : RAW_BASE;
+/** Production: api.ihost.one. Local dev: VITE_API_BASE_URL from .env. */
+const BASE = RAW_BASE;
 
 export function getApiBaseUrl(): string {
   return BASE;
@@ -31,9 +28,7 @@ export function getWebsiteUrl(): string {
       base = BASE;
     }
   }
-  // Canonical website: ihost.one (API is api.ihost.one)
-  if (base && (base.includes("ihostmc.duckdns.org") || base.includes("ihostmc-api.duckdns.org") || base.includes("api.ihost.one")))
-    return "https://ihost.one";
+  if (base && base.includes("api.ihost.one")) return "https://ihost.one";
   return base;
 }
 
@@ -94,6 +89,19 @@ export interface LoginSessionResult {
 
 const FETCH_OPTIONS: RequestInit = { mode: "cors", credentials: "omit" };
 
+/** Called automatically when any API returns 401. Set by App to clear auth so user sees connect screen. */
+let onAuthExpired: (() => void) | null = null;
+
+export function setOnAuthExpired(cb: (() => void) | null): void {
+  onAuthExpired = cb;
+}
+
+function handle401(res: Response): void {
+  if (res.status === 401 && onAuthExpired) {
+    onAuthExpired();
+  }
+}
+
 /** Delay helper for retries */
 function delay(ms: number): Promise<void> {
   return new Promise((r) => setTimeout(r, ms));
@@ -109,14 +117,19 @@ export async function getLoginUrlWithSession(): Promise<LoginSessionResult | nul
   const websiteBase = getWebsiteUrl();
   if (!websiteBase || !BASE) return null;
   const loginPath = "/login?return=app";
-  const maxAttempts = 3;
+  const maxAttempts = 4;
   for (let attempt = 0; attempt < maxAttempts; attempt++) {
+    const backoff = Math.min(500 * 2 ** attempt, 4000);
     try {
+      const controller = new AbortController();
+      const timeout = setTimeout(() => controller.abort(), 10000);
       const res = await fetch(`${BASE}/api/auth/app-session`, {
         method: "POST",
         ...FETCH_OPTIONS,
         headers: { "Content-Type": "application/json" },
+        signal: controller.signal,
       });
+      clearTimeout(timeout);
       const text = await res.text();
       let data: { session_id?: string } = {};
       if (text) {
@@ -124,26 +137,26 @@ export async function getLoginUrlWithSession(): Promise<LoginSessionResult | nul
           data = JSON.parse(text) as { session_id?: string };
         } catch {
           if (attempt === maxAttempts - 1) return null;
-          await delay(400);
+          await delay(backoff);
           continue;
         }
       }
       if (!res.ok) {
         if (attempt === maxAttempts - 1) return null;
-        await delay(400);
+        await delay(backoff);
         continue;
       }
       const sid = data?.session_id?.trim();
       if (!sid) {
         if (attempt === maxAttempts - 1) return null;
-        await delay(400);
+        await delay(backoff);
         continue;
       }
       const url = `${websiteBase}${loginPath}&session=${encodeURIComponent(sid)}`;
       return { url, sessionId: sid };
     } catch {
       if (attempt === maxAttempts - 1) return null;
-      await delay(500);
+      await delay(backoff);
     }
   }
   return null;
@@ -248,6 +261,7 @@ async function request<T>(
   const res = await fetch(`${BASE}${path}`, { ...init, headers });
   const text = await res.text();
   if (!res.ok) {
+    handle401(res);
     const isHtml = text.trimStart().startsWith("<") || /Cannot (GET|POST|PUT|PATCH|DELETE) /i.test(text);
     const isSync = path.includes("/sync/");
     if ((res.status === 404 || isHtml) && isSync) {
@@ -422,6 +436,7 @@ export const api = {
       throw new Error(body.error ?? "AI features require Pro");
     }
     if (!res.ok) {
+      handle401(res);
       let err: { error?: string } = {};
       try {
         if (text) err = JSON.parse(text);
@@ -525,6 +540,11 @@ export const api = {
     return request<{ token: string }>("/api/relay/token", { token: authToken });
   },
 
+  /** Relay config for Share server (assign-port via backend proxy). Use when 200 to avoid 404 on play.ihost.one. */
+  async getRelayConfig(authToken: string): Promise<{ token: string; apiBaseUrl: string; serverAddr: string; serverPort: number }> {
+    return request<{ token: string; apiBaseUrl: string; serverAddr: string; serverPort: number }>("/api/relay/config", { token: authToken });
+  },
+
   /** CurseForge API key – from backend for logged-in users; app uses it so CurseForge works without user entering a key. */
   async getRelayCurseforgeKey(authToken: string): Promise<{ key: string }> {
     return request<{ key: string }>("/api/relay/curseforge-key", { token: authToken });
@@ -620,6 +640,7 @@ export const api = {
       throw new Error("AI is not configured on this server.");
     }
     if (!res.ok) {
+      handle401(res);
       let data: { error?: string } = {};
       try {
         if (text) data = JSON.parse(text);
@@ -669,6 +690,7 @@ export const api = {
       throw new Error("AI is not configured on this server.");
     }
     if (!res.ok) {
+      handle401(res);
       let data: { error?: string } = {};
       try {
         if (text) data = JSON.parse(text);
@@ -698,6 +720,7 @@ export const api = {
     });
     const text = await res.text();
     if (!res.ok) {
+      handle401(res);
       let err: { error?: string } = {};
       try {
         err = JSON.parse(text);
@@ -739,10 +762,60 @@ export const api = {
     });
   },
 
-  /** List sync servers (what the website shows as "Your servers"). */
-  async getSyncServers(token: string): Promise<SyncServerInfo[]> {
-    const list = await request<SyncServerInfo[]>("/api/sync/servers", { token });
+  /** List sync servers (what the website shows as "Your servers"). trashed=true returns trashed servers. */
+  async getSyncServers(token: string, options?: { trashed?: boolean }): Promise<SyncServerInfo[]> {
+    const qs = options?.trashed ? "?trashed=1" : "";
+    const list = await request<SyncServerInfo[]>(`/api/sync/servers${qs}`, { token });
     return Array.isArray(list) ? list : [];
+  },
+
+  /** Archive sync server (hide from main list, like AI advisor). */
+  async archiveSyncServer(token: string, serverId: string): Promise<{ ok: boolean }> {
+    return request(`/api/sync/servers/${encodeURIComponent(serverId)}`, {
+      method: "PATCH",
+      token,
+      body: JSON.stringify({ archived: true }),
+    });
+  },
+
+  /** Unarchive sync server (restore to main list). */
+  async unarchiveSyncServer(token: string, serverId: string): Promise<{ ok: boolean }> {
+    return request(`/api/sync/servers/${encodeURIComponent(serverId)}`, {
+      method: "PATCH",
+      token,
+      body: JSON.stringify({ archived: false }),
+    });
+  },
+
+  /** Move a sync server to trash (soft delete). */
+  async trashSyncServer(token: string, serverId: string): Promise<{ ok: boolean }> {
+    return request(`/api/sync/servers/${encodeURIComponent(serverId)}`, {
+      method: "PATCH",
+      token,
+      body: JSON.stringify({ trashed: true }),
+    });
+  },
+
+  /** Restore a sync server from trash. */
+  async restoreSyncServer(token: string, serverId: string): Promise<{ ok: boolean }> {
+    return request(`/api/sync/servers/${encodeURIComponent(serverId)}`, {
+      method: "PATCH",
+      token,
+      body: JSON.stringify({ restoreFromTrash: true }),
+    });
+  },
+
+  /** Permanently delete a sync server (must be in trash). */
+  async permanentDeleteSyncServer(token: string, serverId: string): Promise<{ ok: boolean }> {
+    return request(`/api/sync/servers/${encodeURIComponent(serverId)}`, {
+      method: "DELETE",
+      token,
+    });
+  },
+
+  /** Purge trashed sync servers older than 30 days. */
+  async purgeSyncTrash(token: string): Promise<{ ok: boolean; purged: number }> {
+    return request("/api/sync/trash/purge", { method: "POST", token });
   },
 
   /** Get backup storage report: total size, mini/big split, files-too-big count, storage limit, tier (for usage in app). */
@@ -785,6 +858,7 @@ export const api = {
     });
     const text = await res.text();
     if (!res.ok) {
+      handle401(res);
       let err: { error?: string } = {};
       try {
         if (text) err = JSON.parse(text);
@@ -819,7 +893,10 @@ export const api = {
       `${BASE}/api/sync/servers/${encodeURIComponent(serverId)}/files/${encodeURIComponent(fileId)}/content`,
       { headers: { Authorization: `Bearer ${token}` } }
     );
-    if (!res.ok) throw new Error(`Failed to get file content: ${res.statusText}`);
+    if (!res.ok) {
+      handle401(res);
+      throw new Error(`Failed to get file content: ${res.statusText}`);
+    }
     return res.text();
   },
 
@@ -1043,6 +1120,8 @@ export interface SyncServerInfo {
   iterationIntervalHours?: number | null;
   /** Save tier for automatic iterations (snapshot | structural | full). */
   iterationSaveTier?: "snapshot" | "structural" | "full" | null;
+  /** When set, server is in trash (soft-deleted). */
+  trashedAt?: string | null;
 }
 
 /** One synced file as returned by GET /api/sync/servers/:id/files */

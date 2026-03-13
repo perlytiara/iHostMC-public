@@ -1,19 +1,11 @@
 node_modules/
 dist/
-dist-ssr/
 src-tauri/target/
-.tauri/
-~/.tauri/
 .env
 .env.local
-.env.*.local
+.env.gh-secrets
 *.log
-.DS_Store
-Thumbs.db
-*.tsbuildinfo
-/test-results/
-/playwright-report/
-/blob-report/
-.idea/
-.vscode/*
-!.vscode/extensions.json
+
+# Tauri signing keys (never commit)
+.tauri_signing_key
+.tauri_signing_key.pub

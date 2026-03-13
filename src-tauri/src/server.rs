@@ -20,6 +20,10 @@ pub struct ServerConfig {
     pub java_path: Option<String>,
     #[serde(with = "path_serde")]
     pub path: PathBuf,
+    #[serde(default)]
+    pub archived: bool,
+    #[serde(default)]
+    pub trashed_at: Option<String>,
 }
 
 mod path_serde {
@@ -182,6 +186,54 @@ pub fn remove_server(id: &str) -> bool {
     let mut list = SERVERS.lock().unwrap();
     if let Some(pos) = list.iter().position(|s| s.id == id) {
         list.remove(pos);
+        save_servers_list(&list);
+        true
+    } else {
+        false
+    }
+}
+
+/// Archive server (hide from active list, like AI advisor). Returns true if updated.
+pub fn archive_server(id: &str) -> bool {
+    let mut list = SERVERS.lock().unwrap();
+    if let Some(s) = list.iter_mut().find(|s| s.id == id) {
+        s.archived = true;
+        save_servers_list(&list);
+        true
+    } else {
+        false
+    }
+}
+
+/// Unarchive server (restore to active list). Returns true if updated.
+pub fn unarchive_server(id: &str) -> bool {
+    let mut list = SERVERS.lock().unwrap();
+    if let Some(s) = list.iter_mut().find(|s| s.id == id) {
+        s.archived = false;
+        save_servers_list(&list);
+        true
+    } else {
+        false
+    }
+}
+
+/// Move server to trash (soft delete). Returns true if updated.
+pub fn trash_server(id: &str) -> bool {
+    let mut list = SERVERS.lock().unwrap();
+    if let Some(s) = list.iter_mut().find(|s| s.id == id) {
+        s.trashed_at = Some(chrono::Utc::now().to_rfc3339());
+        save_servers_list(&list);
+        true
+    } else {
+        false
+    }
+}
+
+/// Restore server from trash. Returns true if updated.
+pub fn restore_server(id: &str) -> bool {
+    let mut list = SERVERS.lock().unwrap();
+    if let Some(s) = list.iter_mut().find(|s| s.id == id) {
+        s.trashed_at = None;
         save_servers_list(&list);
         true
     } else {

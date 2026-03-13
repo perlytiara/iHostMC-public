@@ -1,8 +1,8 @@
 {
   "$schema": "https://schema.tauri.app/config/2",
   "productName": "iHostMC",
-  "version": "1.0.0",
-  "identifier": "com.ihostmc.app",
+  "version": "0.5.8",
+  "identifier": "com.ihostmc.desktop",
   "build": {
     "frontendDist": "../dist",
     "devUrl": "http://localhost:1420",
@@ -11,7 +11,9 @@
   },
   "app": {
     "withGlobalTauri": true,
-    "security": { "csp": null },
+    "security": {
+      "csp": null
+    },
     "windows": [
       {
         "label": "main",
@@ -28,13 +30,25 @@
   },
   "bundle": {
     "active": true,
-    "targets": "all",
-    "icon": ["icons/icon.ico"],
+    "targets": [
+      "nsis",
+      "msi",
+      "deb",
+      "rpm"
+    ],
+    "icon": [
+      "icons/icon.ico"
+    ],
     "windows": {
+      "webviewInstallMode": {
+        "type": "offlineInstaller",
+        "silent": true
+      },
       "nsis": {
         "installerIcon": "icons/icon.ico",
         "headerImage": null,
-        "sidebarImage": null
+        "sidebarImage": null,
+        "installMode": "both"
       },
       "wix": null
     },
@@ -46,9 +60,16 @@
     "longDescription": "Cross-platform Minecraft server management with mod/plugin browsing.",
     "createUpdaterArtifacts": true
   },
-  "plugins":{"deep-link":{"desktop":{"schemes":["ihostmc"]}},
+  "plugins": {
+    "deep-link": {
+      "desktop": {
+        "schemes": [
+          "ihostmc"
+        ]
+      }
+    },
     "updater": {
-      "pubkey": "REPLACE_WITH_PUBLIC_KEY",
+      "pubkey": "dW50cnVzdGVkIGNvbW1lbnQ6IG1pbmlzaWduIHB1YmxpYyBrZXk6IEYyOEU5RjZCRTk4QjA4REYKUldUZkNJdnBhNStPOGcvSzhGM2xVVEExWTFJNEw0VysreWh6ZjhEY0puSjRGbnZJRFFCNEZwNDcK",
       "endpoints": [
         "https://github.com/perlytiara/iHostMC/releases/latest/download/latest.json"
       ]

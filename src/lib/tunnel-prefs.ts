@@ -19,20 +19,23 @@ export function getDefaultRelayToken(): string {
   return RELAY_PUBLIC_TOKEN;
 }
 
-const _defaultServer = {
-  apiBaseUrl: "https://play.ihost.one",
+/** When backend is configured (api.ihost.one), use its relay proxy so assign-port works. Otherwise fall back to play.ihost.one (may 404 if not deployed). */
+function getDefaultApiBaseUrl(): string {
+  const base = getApiBaseUrl();
+  return base ? `${base.replace(/\/$/, "")}/api/relay` : "https://play.ihost.one";
+}
+
+const _defaultServerBase = {
   serverAddr: "play.ihost.one",
   serverPort: 7000,
   token: "", // use getDefaultFrpServer() or getDefaultRelayToken() for actual value
 } as const;
 
 /** Public relay – one server for all iHostMC users. Use getDefaultFrpServer() for config with token. */
-export const DEFAULT_FRP_SERVER = _defaultServer;
-
-/** Default relay config with token filled from env/secret or generated file. */
 export function getDefaultFrpServer(): FrpPrefs {
   return {
-    ..._defaultServer,
+    apiBaseUrl: getDefaultApiBaseUrl(),
+    ..._defaultServerBase,
     token: getDefaultRelayToken(),
   };
 }
@@ -44,10 +47,28 @@ export interface FrpPrefs {
   token: string;
 }
 
+/** Migrate stale relay URLs to backend proxy (fixes assign-port 404). Use play.ihost.one as relay host. */
+function migrateLegacyPrefs(): void {
+  if (typeof localStorage === "undefined") return;
+  const apiBase = localStorage.getItem(KEY_FRP_API_BASE) ?? "";
+  const serverAddr = localStorage.getItem(KEY_FRP_SERVER_ADDR) ?? "";
+  const targetApiBase = getDefaultApiBaseUrl();
+  const targetServerAddr = _defaultServerBase.serverAddr;
+  if (apiBase === "https://play.ihost.one" || apiBase.includes("duckdns.org")) {
+    localStorage.setItem(KEY_FRP_API_BASE, targetApiBase);
+  }
+  if (serverAddr.includes("duckdns.org")) {
+    localStorage.setItem(KEY_FRP_SERVER_ADDR, targetServerAddr);
+  }
+}
+
+let _migrated = false;
+
 export function getFrpPrefs(): FrpPrefs {
   if (typeof localStorage === "undefined") {
     return getDefaultFrpServer();
   }
+  if (!_migrated) { _migrated = true; migrateLegacyPrefs(); }
   const defaultServer = getDefaultFrpServer();
   const apiBase = localStorage.getItem(KEY_FRP_API_BASE);
   const serverAddr = localStorage.getItem(KEY_FRP_SERVER_ADDR);
@@ -74,6 +95,11 @@ export function setFrpPrefs(prefs: FrpPrefs): void {
 }
 
 let cachedRelayTokenFromBackend: string | null = null;
+
+/** Clear cached relay token (call on sign-out so next login gets a fresh token). */
+export function clearRelayTokenCache(): void {
+  cachedRelayTokenFromBackend = null;
+}
 
 /**
  * Resolve the relay token for Share: token from backend when logged in (synced on login), or build-time default.

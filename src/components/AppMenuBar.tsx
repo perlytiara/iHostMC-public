@@ -25,6 +25,7 @@ import {
   LogOut,
 } from "lucide-react";
 import { cn } from "@/lib/utils";
+import { APP_VERSION } from "@/lib/version.generated";
 
 export interface MenuBarServerContext {
   hasServerSelected: boolean;
@@ -261,7 +262,7 @@ export function AppMenuBar({
                 {t("menu.about")} iHostMC
               </DropdownMenu.Item>
               <DropdownMenu.Item className={itemClass} disabled>
-                {t("menu.version")}: {t("common.version")}
+                {t("menu.version")}: v{APP_VERSION}
               </DropdownMenu.Item>
               {updateAvailable && (
                 <DropdownMenu.Item
@@ -273,15 +274,13 @@ export function AppMenuBar({
                   {isDownloadingUpdate ? t("header.downloading") : t("header.install")}
                 </DropdownMenu.Item>
               )}
-              {import.meta.env.VITE_PUBLIC_REPO !== "true" && (
-                <>
-                  <DropdownMenu.Separator className="my-1 h-px bg-border" />
-                  <DropdownMenu.Item className={itemClass} onSelect={onDevMenu}>
-                    <Bug className="h-4 w-4" />
-                    {t("menu.devMenu")}
-                  </DropdownMenu.Item>
-                </>
-              )}
+              <>
+                <DropdownMenu.Separator className="my-1 h-px bg-border" />
+                <DropdownMenu.Item className={itemClass} onSelect={onDevMenu}>
+                  <Bug className="h-4 w-4" />
+                  {t("menu.devMenu")}
+                </DropdownMenu.Item>
+              </>
             </DropdownMenu.Content>
           </DropdownMenu.Portal>
         </DropdownMenu.Root>
@@ -299,7 +298,7 @@ export function AppMenuBar({
           <Moon className={cn("absolute h-4 w-4 rotate-90 scale-0 transition-all dark:rotate-0 dark:scale-100")} />
         </Button>
         <span className="rounded bg-muted px-2 py-0.5 text-xs text-muted-foreground">
-          {t("common.version")}
+          v{APP_VERSION}
         </span>
       </div>
     </div>

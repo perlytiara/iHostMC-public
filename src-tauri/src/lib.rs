@@ -23,7 +23,6 @@ pub fn run() {
         builder = builder
             .plugin(tauri_plugin_single_instance::init(
                 |_app, argv, _cwd| {
-                    // Second instance opened (e.g. via ihostmc://); deep-link plugin emits the URL to the first instance
                     let _ = argv;
                 },
             ))
@@ -41,6 +40,10 @@ pub fn run() {
             commands::list_servers,
             commands::get_server_ports,
             commands::create_server,
+            commands::archive_server,
+            commands::unarchive_server,
+            commands::trash_server,
+            commands::restore_server,
             commands::delete_server,
             commands::start_server,
             commands::stop_server,
@@ -175,5 +178,62 @@ pub fn run() {
             Ok(())
         })
         .run(tauri::generate_context!())
-        .expect("error while running tauri application");
+        .unwrap_or_else(|e| {
+            let msg = format!("Tauri run error: {e}");
+            write_crash_log(&msg);
+            panic!("{msg}");
+        });
+}
+
+/// Writes a crash/error line to the app log file. Returns true if written to file, false otherwise.
+pub fn write_crash_log(msg: &str) -> bool {
+    let dir = crash_log_dir();
+    if let Some(dir) = dir {
+        if std::fs::create_dir_all(&dir).is_ok() {
+            if let Ok(mut f) = std::fs::OpenOptions::new()
+                .create(true)
+                .append(true)
+                .open(dir.join("crash.log"))
+            {
+                use std::io::Write;
+                return writeln!(f, "{msg}").is_ok();
+            }
+        }
+    }
+    #[cfg(not(target_os = "windows"))]
+    {
+        eprintln!("{msg}");
+    }
+    false
+}
+
+/// Returns the app data/config directory for crash logs. Cross-platform.
+fn crash_log_dir() -> Option<std::path::PathBuf> {
+    #[cfg(target_os = "windows")]
+    {
+        std::env::var_os("APPDATA").map(std::path::PathBuf::from)
+    }
+    #[cfg(target_os = "macos")]
+    {
+        std::env::var_os("HOME").map(|h| {
+            std::path::Path::new(&h)
+                .join("Library")
+                .join("Application Support")
+        })
+    }
+    #[cfg(all(unix, not(target_os = "macos")))]
+    {
+        std::env::var_os("XDG_CONFIG_HOME")
+            .map(std::path::PathBuf::from)
+            .or_else(|| {
+                std::env::var_os("HOME")
+                    .map(|h| std::path::Path::new(&h).join(".config"))
+            })
+    }
+    #[cfg(not(any(windows, target_os = "macos", unix)))]
+    {
+        let _ = std::env::var_os("HOME");
+        None
+    }
+    .map(|p| p.join("com.ihostmc.desktop"))
 }

@@ -1,6 +1,6 @@
 [package]
 name = "ihostmc"
-version = "1.0.0"
+version = "0.5.8"
 description = "Minecraft server manager"
 edition = "2021"
 rust-version = "1.70"
@@ -13,7 +13,7 @@ crate-type = ["staticlib", "cdylib", "rlib"]
 tauri-build = { version = "2", features = ["codegen"] }
 
 [dependencies]
-tauri = { version = "2", features = ["tray-icon"] }
+tauri = { version = "2", features = ["tray-icon", "devtools"] }
 tauri-plugin-shell = "2"
 tauri-plugin-process = "2"
 tauri-plugin-deep-link = "2"
@@ -40,6 +40,7 @@ flate2 = "1.0"
 urlencoding = "2"
 base64 = "0.22"
 open = "5"
+chrono = "0.4"
 axum = { version = "0.7", features = ["json"] }
 tower-http = { version = "0.5", features = ["cors"] }
 igd-next = "0.16"
