@@ -32,6 +32,8 @@
     "core:tray:default",
     "shell:allow-open",
     "updater:allow-check",
+    "updater:allow-download",
+    "updater:allow-install",
     "updater:allow-download-and-install",
     "process:allow-restart",
     "autostart:allow-enable",

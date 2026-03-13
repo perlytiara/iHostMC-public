@@ -1,6 +1,6 @@
 [package]
 name = "ihostmc"
-version = "0.5.9"
+version = "0.1.0"
 description = "Minecraft server manager"
 edition = "2021"
 rust-version = "1.70"
