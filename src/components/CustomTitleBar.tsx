@@ -103,7 +103,7 @@ export function CustomTitleBar({
       data-tauri-drag-region
     >
       {/* Left: Logo + App Name + Menus */}
-      <div className="flex min-w-0 shrink-0 items-center gap-1 overflow-hidden pl-3" data-tauri-drag-region>
+      <div className="flex min-w-0 flex-shrink items-center gap-1 overflow-hidden pl-3" data-tauri-drag-region>
         <motion.div
           whileHover={{ scale: 1.08 }}
           whileTap={{ scale: 0.95 }}
@@ -113,7 +113,7 @@ export function CustomTitleBar({
           <AppLogo size={38} />
         </motion.div>
         <span
-          className="ml-1.5 shrink-0 text-sm font-bold tracking-tight text-foreground cursor-pointer"
+          className="ml-1.5 shrink-0 text-sm font-bold tracking-tight text-foreground cursor-pointer hidden md:inline"
           onClick={() => onNavigate("home")}
           data-tauri-drag-region
         >
@@ -121,12 +121,12 @@ export function CustomTitleBar({
         </span>
 
         {/* Compact menus */}
-        <nav className="ml-3 flex min-w-0 shrink items-stretch gap-0 overflow-hidden" data-tauri-drag-region>
+        <nav className="ml-3 flex min-w-0 flex-shrink items-stretch gap-0 overflow-hidden" data-tauri-drag-region>
           <DropdownMenu.Root>
             <DropdownMenu.Trigger asChild>
               <button
                 type="button"
-                className="flex h-full items-center px-2.5 text-xs text-muted-foreground hover:text-foreground hover:bg-accent/50 rounded-md transition-colors"
+                className="flex h-full items-center px-2 md:px-2.5 text-xs text-muted-foreground hover:text-foreground hover:bg-accent/50 rounded-md transition-colors shrink-0 whitespace-nowrap"
               >
                 {t("menu.file")}
               </button>
@@ -156,7 +156,7 @@ export function CustomTitleBar({
               <DropdownMenu.Trigger asChild>
                 <button
                   type="button"
-                  className="flex h-full items-center px-2.5 text-xs text-muted-foreground hover:text-foreground hover:bg-accent/50 rounded-md transition-colors"
+                  className="flex h-full items-center px-2 md:px-2.5 text-xs text-muted-foreground hover:text-foreground hover:bg-accent/50 rounded-md transition-colors shrink-0 whitespace-nowrap"
                 >
                   {t("menu.server")}
                 </button>
@@ -184,7 +184,7 @@ export function CustomTitleBar({
             <DropdownMenu.Trigger asChild>
               <button
                 type="button"
-                className="flex h-full items-center px-2.5 text-xs text-muted-foreground hover:text-foreground hover:bg-accent/50 rounded-md transition-colors"
+                className="flex h-full items-center px-2 md:px-2.5 text-xs text-muted-foreground hover:text-foreground hover:bg-accent/50 rounded-md transition-colors shrink-0 whitespace-nowrap"
               >
                 {t("menu.help")}
               </button>
@@ -228,8 +228,8 @@ export function CustomTitleBar({
       </div>
 
       {/* Center: Navigation tabs */}
-      <div className="absolute inset-0 flex items-center justify-center pointer-events-none" data-tauri-drag-region>
-        <div className="flex shrink-0 items-center gap-1 rounded-xl bg-muted/60 p-1 pointer-events-auto min-w-[220px]">
+      <div className="absolute inset-0 flex items-center justify-center pointer-events-none px-2" data-tauri-drag-region>
+        <div className="flex shrink-0 items-center gap-0.5 md:gap-1 rounded-xl bg-muted/60 p-0.5 md:p-1 pointer-events-auto min-w-0 max-w-full">
           {getNavItems(settingsAsIcon).map((item) => {
             const Icon = item.icon;
             const isActive = currentPage === item.id;
@@ -239,7 +239,7 @@ export function CustomTitleBar({
                 type="button"
                 onClick={() => onNavigate(item.id)}
                 className={cn(
-                  "relative flex items-center gap-1.5 rounded-lg px-3.5 py-1.5 text-xs font-medium transition-colors",
+                  "relative flex items-center gap-1 md:gap-1.5 rounded-lg px-2 md:px-3.5 py-1 md:py-1.5 text-xs font-medium transition-colors shrink-0",
                   isActive ? "text-primary-foreground" : "text-muted-foreground hover:text-foreground"
                 )}
               >
@@ -250,9 +250,9 @@ export function CustomTitleBar({
                     transition={{ type: "spring", stiffness: 350, damping: 30 }}
                   />
                 )}
-                <span className="relative z-10 flex items-center gap-1.5">
-                  <Icon className="h-3.5 w-3.5" />
-                  {t(item.labelKey)}
+                <span className="relative z-10 flex items-center gap-1 md:gap-1.5 whitespace-nowrap">
+                  <Icon className="h-3.5 w-3.5 shrink-0" />
+                  <span className="hidden md:inline">{t(item.labelKey)}</span>
                 </span>
               </button>
             );
@@ -261,7 +261,7 @@ export function CustomTitleBar({
       </div>
 
       {/* Right: Settings icon (when settings-as-icon) + Hamburger app menu + Theme + Window controls */}
-      <div className="ml-auto flex shrink-0 items-center gap-0.5 pr-0" data-tauri-drag-region>
+      <div className="ml-auto flex shrink-0 items-center gap-0.5 pr-0 min-w-0" data-tauri-drag-region>
         {settingsAsIcon && (
           <motion.button
             type="button"

@@ -115,36 +115,66 @@ export function HighlightTourOverlay({ active, step, onNext, onComplete }: Highl
           )}
         </div>
 
-        {/* Tooltip card: below or above the target */}
-        {rect && (
-          <motion.div
-            initial={{ opacity: 0, y: 8 }}
-            animate={{ opacity: 1, y: 0 }}
-            exit={{ opacity: 0, y: -8 }}
-            className="absolute left-1/2 -translate-x-1/2 w-full max-w-sm px-4"
-            style={{
-              top: rect.bottom + PADDING + 16,
-            }}
-          >
-            <div className="rounded-xl border border-border bg-card p-4 shadow-xl">
-              <p className="font-semibold text-foreground">{t(titleKey)}</p>
-              <p className="mt-1 text-sm text-muted-foreground">{t(descKey)}</p>
-              <div className="mt-4 flex items-center justify-between">
-                <button
-                  type="button"
-                  onClick={onComplete}
-                  className="text-xs text-muted-foreground hover:text-foreground"
-                >
-                  {t("onboarding.skip")}
-                </button>
-                <Button size="sm" onClick={handleNext} className="gap-1.5">
-                  {isLast ? t("tour.done") : t("onboarding.next")}
-                  <ArrowRight className="h-3.5 w-3.5" />
-                </Button>
+        {/* Tooltip card: below or above the target, positioned to stay within viewport */}
+        {rect && (() => {
+          const TOOLTIP_SPACING = 16;
+          const TOOLTIP_HEIGHT_ESTIMATE = 140; // Approximate height of tooltip
+          const viewportHeight = window.innerHeight;
+          const viewportWidth = window.innerWidth;
+          
+          // Check if there's enough space below
+          const spaceBelow = viewportHeight - rect.bottom - PADDING;
+          const spaceAbove = rect.top - PADDING;
+          const showBelow = spaceBelow >= TOOLTIP_HEIGHT_ESTIMATE || spaceBelow > spaceAbove;
+          
+          // Calculate vertical position
+          const topPosition = showBelow 
+            ? rect.bottom + PADDING + TOOLTIP_SPACING
+            : rect.top - TOOLTIP_HEIGHT_ESTIMATE - PADDING - TOOLTIP_SPACING;
+          
+          // Ensure tooltip stays within viewport bounds
+          const clampedTop = Math.max(PADDING, Math.min(topPosition, viewportHeight - TOOLTIP_HEIGHT_ESTIMATE - PADDING));
+          
+          // Calculate horizontal position (center on target, but clamp to viewport)
+          const tooltipWidth = Math.min(384, viewportWidth - PADDING * 2); // max-w-sm = 384px
+          const targetCenterX = rect.left + rect.width / 2;
+          const tooltipLeft = Math.max(
+            PADDING,
+            Math.min(targetCenterX - tooltipWidth / 2, viewportWidth - tooltipWidth - PADDING)
+          );
+          
+          return (
+            <motion.div
+              initial={{ opacity: 0, y: showBelow ? 8 : -8 }}
+              animate={{ opacity: 1, y: 0 }}
+              exit={{ opacity: 0, y: showBelow ? -8 : 8 }}
+              className="absolute w-full max-w-sm px-4"
+              style={{
+                top: clampedTop,
+                left: tooltipLeft,
+                width: tooltipWidth,
+              }}
+            >
+              <div className="rounded-xl border border-border bg-card p-4 shadow-xl">
+                <p className="font-semibold text-foreground">{t(titleKey)}</p>
+                <p className="mt-1 text-sm text-muted-foreground">{t(descKey)}</p>
+                <div className="mt-4 flex items-center justify-between">
+                  <button
+                    type="button"
+                    onClick={onComplete}
+                    className="text-xs text-muted-foreground hover:text-foreground"
+                  >
+                    {t("onboarding.skip")}
+                  </button>
+                  <Button size="sm" onClick={handleNext} className="gap-1.5">
+                    {isLast ? t("tour.done") : t("onboarding.next")}
+                    <ArrowRight className="h-3.5 w-3.5" />
+                  </Button>
+                </div>
               </div>
-            </div>
-          </motion.div>
-        )}
+            </motion.div>
+          );
+        })()}
       </motion.div>
     </AnimatePresence>
   );
