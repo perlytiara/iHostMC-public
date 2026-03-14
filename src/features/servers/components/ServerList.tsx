@@ -301,6 +301,33 @@ export function ServerList({
   const [startError, setStartError] = useState<string | null>(null);
   const contextMenuRef = useRef<HTMLDivElement>(null);
 
+  /** When backend says a server is active (not archived, not trashed), make local state match so the app shows it as present/active. Defined early so useEffects below can depend on it. */
+  const applyCloudStateToLocal = useCallback(
+    async (syncedList: SyncServerInfo[]) => {
+      if (!isTauri()) return;
+      let needRefresh = false;
+      for (const s of syncedList) {
+        if (s.trashedAt || s.archived) continue;
+        const local = servers.find((l) => l.id === s.hostId);
+        if (!local || (!local.archived && !local.trashed_at)) continue;
+        try {
+          await invoke("unarchive_server", { id: s.hostId });
+          needRefresh = true;
+        } catch {
+          // ignore
+        }
+        try {
+          await invoke("restore_server", { id: s.hostId });
+          needRefresh = true;
+        } catch {
+          // ignore (e.g. not in trash)
+        }
+      }
+      if (needRefresh) refresh();
+    },
+    [servers, refresh]
+  );
+
   useEffect(() => {
     onServerCountChange?.(servers.length);
   }, [servers.length, onServerCountChange]);
@@ -703,33 +730,6 @@ export function ServerList({
 
   const isRunning = runningId !== null;
   const [sidebarCollapsed, setSidebarCollapsed] = useState(true);
-
-  /** When backend says a server is active (not archived, not trashed), make local state match so the app shows it as present/active. */
-  const applyCloudStateToLocal = useCallback(
-    async (syncedList: SyncServerInfo[]) => {
-      if (!isTauri()) return;
-      let needRefresh = false;
-      for (const s of syncedList) {
-        if (s.trashedAt || s.archived) continue;
-        const local = servers.find((l) => l.id === s.hostId);
-        if (!local || (!local.archived && !local.trashed_at)) continue;
-        try {
-          await invoke("unarchive_server", { id: s.hostId });
-          needRefresh = true;
-        } catch {
-          // ignore
-        }
-        try {
-          await invoke("restore_server", { id: s.hostId });
-          needRefresh = true;
-        } catch {
-          // ignore (e.g. not in trash)
-        }
-      }
-      if (needRefresh) refresh();
-    },
-    [servers, refresh]
-  );
 
   // Auto-refresh server list and synced servers periodically (no manual refresh needed in mini sidebar)
   useEffect(() => {
