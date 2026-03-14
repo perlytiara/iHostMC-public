@@ -239,9 +239,12 @@ export function ServerList({
   const [slideshowIndex, setSlideshowIndex] = useState(0);
   const idleTimeoutRef = useRef<ReturnType<typeof setTimeout> | null>(null);
   const slideshowIntervalRef = useRef<ReturnType<typeof setInterval> | null>(null);
-  const { syncedServers, syncNow, syncing: metaSyncing, refreshSynced } = useSyncServers(servers, token, {
+  const { syncedServers, syncNow, syncing: metaSyncing, refreshSynced, error: syncError } = useSyncServers(servers, token, {
     autoSyncOnLoad: getAutoBackupEnabled(),
   });
+  useEffect(() => {
+    if (syncError) toast.error(syncError);
+  }, [syncError]);
   /** Merge backend (website) state: active = not archived/trashed locally AND not archived/trashed on backend. */
   const activeServers = servers.filter((s) => {
     if (s.archived || s.trashed_at) return false;

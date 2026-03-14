@@ -67,6 +67,10 @@ export function useSyncServers(
       const toSync = serverId
         ? activeServers.filter((s) => s.id === serverId)
         : activeServers;
+      if (toSync.length === 0) {
+        await refreshSynced();
+        return undefined;
+      }
       for (const s of toSync) {
         const res = await api.syncServer(token, {
           hostId: s.id,
