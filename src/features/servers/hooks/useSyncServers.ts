@@ -80,12 +80,11 @@ export function useSyncServers(
           },
         });
         if (serverId && s.id === serverId) backendId = res.id;
-        // Ensure server shows as active on website (not archived, not in trash)
+        // Ensure server shows as active on website (not archived). Skip restoreFromTrash - upsert already sets trashed_at = NULL; calling it causes 404 for non-trashed servers.
         try {
           await api.unarchiveSyncServer(token, res.id);
-          await api.restoreSyncServer(token, res.id);
         } catch (_) {
-          // Ignore if already active or restore not applicable
+          // Ignore if already active
         }
       }
       setLastSyncedAt(now);
