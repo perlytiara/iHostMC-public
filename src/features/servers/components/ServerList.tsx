@@ -242,9 +242,23 @@ export function ServerList({
   const { syncedServers, syncNow, syncing: metaSyncing, refreshSynced } = useSyncServers(servers, token, {
     autoSyncOnLoad: getAutoBackupEnabled(),
   });
-  const activeServers = servers.filter((s) => !s.archived && !s.trashed_at);
-  const archivedServers = servers.filter((s) => s.archived && !s.trashed_at);
-  const trashedServers = servers.filter((s) => s.trashed_at);
+  /** Merge backend (website) state: active = not archived/trashed locally AND not archived/trashed on backend. */
+  const activeServers = servers.filter((s) => {
+    if (s.archived || s.trashed_at) return false;
+    const synced = syncedServers.find((r) => r.hostId === s.id);
+    if (synced && (synced.archived || synced.trashedAt)) return false;
+    return true;
+  });
+  const archivedServers = servers.filter((s) => {
+    if (s.trashed_at) return false;
+    const synced = syncedServers.find((r) => r.hostId === s.id);
+    if (synced?.trashedAt) return false;
+    return s.archived === true || (!!synced && synced.archived === true);
+  });
+  const trashedServers = servers.filter((s) => {
+    const synced = syncedServers.find((r) => r.hostId === s.id);
+    return !!s.trashed_at || (!!synced && !!synced.trashedAt);
+  });
   /** Sync servers that exist on the website/cloud but have no local server on this device (e.g. from another device). */
   const remoteOnlyServers = syncedServers.filter(
     (s) => !s.trashedAt && !s.archived && !servers.some((l) => l.id === s.hostId)
@@ -2070,7 +2084,11 @@ function ServerBackupSyncTab({
         toast.error(t("servers.snapshotUploadFailed", { defaultValue: "Could not upload snapshot. Scan server first." }));
         return;
       }
-      await api.createArchive(token, backendServerId, { saveTier: "snapshot", keepLiveSync: true });
+      await api.createArchive(token, backendServerId, {
+        name: `${server.name} Essentials only ${new Date().toISOString().slice(0, 10)}`,
+        saveTier: "snapshot",
+        keepLiveSync: true,
+      });
       await fileSyncState.refreshSyncedFiles(backendServerId);
       await fileSyncState.refreshSummary(backendServerId);
       await refreshSynced();
@@ -2109,7 +2127,11 @@ function ServerBackupSyncTab({
       });
       await fileSyncState.refreshSyncedFiles(backendServerId);
       await fileSyncState.refreshSummary(backendServerId);
-      await api.createArchive(token, backendServerId, { saveTier: "structural", keepLiveSync: true });
+      await api.createArchive(token, backendServerId, {
+        name: `${server.name} Essentials ${new Date().toISOString().slice(0, 10)}`,
+        saveTier: "structural",
+        keepLiveSync: true,
+      });
       await fileSyncState.refreshSyncedFiles(backendServerId);
       await fileSyncState.refreshSummary(backendServerId);
       await refreshSynced();
@@ -2148,7 +2170,11 @@ function ServerBackupSyncTab({
       });
       await fileSyncState.refreshSyncedFiles(backendServerId);
       await fileSyncState.refreshSummary(backendServerId);
-      await api.createArchive(token, backendServerId, { saveTier: "full", keepLiveSync: true });
+      await api.createArchive(token, backendServerId, {
+        name: `${server.name} Full backup ${new Date().toISOString().slice(0, 10)}`,
+        saveTier: "full",
+        keepLiveSync: true,
+      });
       await fileSyncState.refreshSyncedFiles(backendServerId);
       await fileSyncState.refreshSummary(backendServerId);
       await refreshSynced();
@@ -2186,7 +2212,7 @@ function ServerBackupSyncTab({
       await fileSyncState.refreshSyncedFiles(backendServerId);
       await fileSyncState.refreshSummary(backendServerId);
       await api.createArchive(token, backendServerId, {
-        name: `${server.name} Map ${new Date().toISOString().slice(0, 10)}`,
+        name: `${server.name} Map save ${new Date().toISOString().slice(0, 10)}`,
         saveTier: "world",
         scope: "world",
         keepLiveSync: true,
@@ -2236,7 +2262,7 @@ function ServerBackupSyncTab({
       await fileSyncState.refreshSummary(backendServerId);
       const name =
         customBackupName.trim() ||
-        `${server.name} Custom ${new Date().toISOString().slice(0, 10)}`;
+        `${server.name} Custom save ${new Date().toISOString().slice(0, 10)}`;
       await api.createArchive(token, backendServerId, {
         name,
         saveTier: "full",
@@ -2313,71 +2339,85 @@ function ServerBackupSyncTab({
           <div className="space-y-3 rounded-xl border border-border bg-card/60 p-4">
             <div>
               <h3 className="text-sm font-semibold text-foreground">
-                {t("servers.manualBackup", { defaultValue: "Manual backup" })}
+                {t("servers.liveSyncSection", { defaultValue: "Live sync & backups" })}
               </h3>
               <p className="text-[11px] text-muted-foreground mt-0.5">
-                {t("servers.saveTiersIntro", { defaultValue: "Choose what to save. Backup appears in Archives; live sync is kept." })}
+                {t("servers.liveSyncIntro", { defaultValue: "Choose Essentials (config, mods, plugins) or Full backup for live sync. Archive from the website. Map and Custom create separate saves." })}
               </p>
             </div>
-            {/* Small buttons: Snapshot, Structural, Full, Map backup, Customize */}
-            <div className="flex flex-wrap items-center gap-2">
-              <Button
-                size="sm"
-                variant="outline"
-                className="border-zinc-500/60 text-zinc-300 hover:bg-zinc-800/80 hover:text-zinc-100"
-                disabled={!!savingTier || fileSyncState.syncing || !token || !manifest?.files?.length}
-                onClick={handleSnapshotOnly}
-              >
-                {savingTier === "snapshot" ? <Loader2 className="h-3.5 w-3.5 animate-spin" /> : <FileText className="h-3.5 w-3.5" />}
-                <span className="ml-1">{t("servers.saveSnapshot", { defaultValue: "Snapshot" })}</span>
-              </Button>
-              <Button
-                size="sm"
-                variant="secondary"
-                className="bg-blue-900/40 text-blue-200 border-blue-600/50 hover:bg-blue-800/50"
-                disabled={!!savingTier || fileSyncState.syncing || !token || !hasBackend || !manifest?.files?.length}
-                onClick={handleStructural}
-                title={!hasLiveData ? t("servers.syncFirstToUpload", { defaultValue: "Sync first to upload data" }) : undefined}
-              >
-                {savingTier === "structural" ? <Loader2 className="h-3.5 w-3.5 animate-spin" /> : <Package className="h-3.5 w-3.5" />}
-                <span className="ml-1">{t("servers.saveStructural", { defaultValue: "Structural" })}</span>
-              </Button>
-              <Button
-                size="sm"
-                variant="default"
-                className="bg-emerald-700 hover:bg-emerald-600 text-white border-0"
-                disabled={!!savingTier || fileSyncState.syncing || !token || !hasBackend || !manifest?.files?.length}
-                onClick={handleFull}
-                title={!hasLiveData ? t("servers.syncFirstToUpload", { defaultValue: "Sync first to upload data" }) : undefined}
-              >
-                {savingTier === "full" ? <Loader2 className="h-3.5 w-3.5 animate-spin" /> : <CloudUpload className="h-3.5 w-3.5" />}
-                <span className="ml-1">{t("servers.saveFull", { defaultValue: "Full backup" })}</span>
-              </Button>
-              <Button
-                size="sm"
-                variant="outline"
-                className="border-amber-500/50 text-amber-200 hover:bg-amber-900/30"
-                disabled={!!savingTier || fileSyncState.syncing || !token || !hasBackend || !manifest?.files?.length}
-                onClick={handleMapBackup}
-                title={t("servers.mapBackupTooltip", { defaultValue: "World/map folders only (world, world_nether, world_the_end)" })}
-              >
-                {savingTier === "world" ? <Loader2 className="h-3.5 w-3.5 animate-spin" /> : <FolderOpen className="h-3.5 w-3.5" />}
-                <span className="ml-1">{t("servers.saveMapBackup", { defaultValue: "Map backup" })}</span>
-              </Button>
-              <Button
-                size="sm"
-                variant="outline"
-                className="border-border text-muted-foreground hover:text-foreground"
-                disabled={!!savingTier || fileSyncState.syncing || !token || !hasBackend || !manifest?.files?.length}
-                onClick={() => setCustomizeBackupOpen((o) => !o)}
-              >
-                <Settings2 className="h-3.5 w-3.5" />
-                <span className="ml-1">{t("servers.customizeBackup", { defaultValue: "Customize" })}</span>
-              </Button>
+            {/* Primary: Essentials (default) or Full — what goes to Live sync */}
+            <div>
+              <p className="text-[10px] font-medium text-muted-foreground uppercase tracking-wider mb-1.5">
+                {t("servers.liveSyncChoice", { defaultValue: "Live sync (choose one)" })}
+              </p>
+              <div className="flex flex-wrap items-center gap-2">
+                <Button
+                  size="sm"
+                  variant="secondary"
+                  className="bg-blue-900/40 text-blue-200 border-blue-600/50 hover:bg-blue-800/50"
+                  disabled={!!savingTier || fileSyncState.syncing || !token || !hasBackend || !manifest?.files?.length}
+                  onClick={handleStructural}
+                  title={!hasLiveData ? t("servers.syncFirstToUpload", { defaultValue: "Sync first to upload data" }) : t("servers.essentialsTooltip", { defaultValue: "Config, mods, plugins — no worlds. Re-download mods when restoring." })}
+                >
+                  {savingTier === "structural" ? <Loader2 className="h-3.5 w-3.5 animate-spin" /> : <Package className="h-3.5 w-3.5" />}
+                  <span className="ml-1">{t("servers.syncEssentials", { defaultValue: "Sync Essentials" })}</span>
+                </Button>
+                <Button
+                  size="sm"
+                  variant="default"
+                  className="bg-emerald-700 hover:bg-emerald-600 text-white border-0"
+                  disabled={!!savingTier || fileSyncState.syncing || !token || !hasBackend || !manifest?.files?.length}
+                  onClick={handleFull}
+                  title={!hasLiveData ? t("servers.syncFirstToUpload", { defaultValue: "Sync first to upload data" }) : t("servers.fullBackupTooltip", { defaultValue: "Everything: config, mods, plugins, worlds. Server JAR included." })}
+                >
+                  {savingTier === "full" ? <Loader2 className="h-3.5 w-3.5 animate-spin" /> : <CloudUpload className="h-3.5 w-3.5" />}
+                  <span className="ml-1">{t("servers.syncFull", { defaultValue: "Sync Full" })}</span>
+                </Button>
+              </div>
+            </div>
+            {/* Secondary: Map save, Custom save — creates archives */}
+            <div>
+              <p className="text-[10px] font-medium text-muted-foreground uppercase tracking-wider mb-1.5">
+                {t("servers.otherSaves", { defaultValue: "Save a backup" })}
+              </p>
+              <div className="flex flex-wrap items-center gap-2">
+                <Button
+                  size="sm"
+                  variant="outline"
+                  className="border-amber-500/50 text-amber-200 hover:bg-amber-900/30"
+                  disabled={!!savingTier || fileSyncState.syncing || !token || !hasBackend || !manifest?.files?.length}
+                  onClick={handleMapBackup}
+                  title={t("servers.mapSaveTooltip", { defaultValue: "World folders only. Creates a Map save in Archives." })}
+                >
+                  {savingTier === "world" ? <Loader2 className="h-3.5 w-3.5 animate-spin" /> : <FolderOpen className="h-3.5 w-3.5" />}
+                  <span className="ml-1">{t("servers.mapSave", { defaultValue: "Map save" })}</span>
+                </Button>
+                <Button
+                  size="sm"
+                  variant="outline"
+                  className="border-border text-muted-foreground hover:text-foreground"
+                  disabled={!!savingTier || fileSyncState.syncing || !token || !hasBackend || !manifest?.files?.length}
+                  onClick={() => setCustomizeBackupOpen((o) => !o)}
+                >
+                  <Settings2 className="h-3.5 w-3.5" />
+                  <span className="ml-1">{t("servers.customSave", { defaultValue: "Custom save" })}</span>
+                </Button>
+                <Button
+                  size="sm"
+                  variant="ghost"
+                  className="text-muted-foreground hover:text-foreground"
+                  disabled={!!savingTier || fileSyncState.syncing || !token || !manifest?.files?.length}
+                  onClick={handleSnapshotOnly}
+                  title={t("servers.essentialsOnlyTooltip", { defaultValue: "Metadata only: preset, file tree, mod list. No files — free." })}
+                >
+                  {savingTier === "snapshot" ? <Loader2 className="h-3.5 w-3.5 animate-spin" /> : <FileText className="h-3.5 w-3.5" />}
+                  <span className="ml-1">{t("servers.essentialsOnly", { defaultValue: "Essentials only" })}</span>
+                </Button>
+              </div>
             </div>
             {!hasLiveData && (
               <p className="text-[11px] text-amber-600 dark:text-amber-400">
-                {t("servers.syncFirstHint", { defaultValue: "Sync first to upload data, then choose Structural, Full, Map or Customize. Snapshot is available now." })}
+                {t("servers.syncFirstHint", { defaultValue: "Sync Essentials or Full first to upload data. Then archive from the website or create Map/Custom saves." })}
               </p>
             )}
             {/* Customize panel: choose categories + optional name */}
@@ -2430,7 +2470,7 @@ function ServerBackupSyncTab({
                     onClick={handleCustomBackup}
                   >
                     {savingTier === "custom" ? <Loader2 className="h-3.5 w-3.5 animate-spin shrink-0" /> : null}
-                    <span className={savingTier === "custom" ? "ml-1" : ""}>{t("servers.createCustomBackup", { defaultValue: "Create custom backup" })}</span>
+                    <span className={savingTier === "custom" ? "ml-1" : ""}>{t("servers.createCustomSave", { defaultValue: "Create custom save" })}</span>
                   </Button>
                   <Button size="sm" variant="ghost" onClick={() => setCustomizeBackupOpen(false)}>
                     {t("servers.cancel", { defaultValue: "Cancel" })}
@@ -2461,10 +2501,7 @@ function ServerBackupSyncTab({
                     {t("servers.includeServerJar", { defaultValue: "Include server JAR (re-download from preset when restoring)" })}
                   </label>
                   <p className="text-muted-foreground/90">
-                    Always included in Full; optional for Structural, Map, Custom.
-                  </p>
-                  <p className="text-muted-foreground/90">
-                    Snapshot = metadata only (free). Structural = no worlds. Full = everything. Map = worlds only. Customize = pick folders (World, Config, Mods, etc.).
+                    Essentials = config, mods, plugins. Full = everything. Map save = worlds only. Custom save = pick folders.
                   </p>
                 </div>
               )}
