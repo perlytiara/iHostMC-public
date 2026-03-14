@@ -1,5 +1,6 @@
 import { useCallback, useEffect, useRef, useState } from "react";
 import { api, getApiBaseUrl, type SyncServerInfo } from "@/lib/api-client";
+import { toast } from "@/lib/toast-store";
 import type { ServerConfig } from "../types";
 
 export interface SyncState {
@@ -94,12 +95,7 @@ export function useSyncServers(
       setLastSyncedAt(now);
       await refreshSynced();
       if (toSync.length > 0) {
-        try {
-          const { toast } = await import("sonner");
-          toast.success(`Synced ${toSync.length} server${toSync.length === 1 ? "" : "s"} to the cloud`);
-        } catch (_) {
-          // sonner not available
-        }
+        toast.success(`Synced ${toSync.length} server${toSync.length === 1 ? "" : "s"} to the cloud`);
       }
       return backendId;
     } catch (e) {
