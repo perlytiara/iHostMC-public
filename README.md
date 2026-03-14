@@ -1,5 +1,9 @@
 # iHostMC — Minecraft Server Manager
 
+<p align="center">
+  <img src="docs/images/ihost-hero-banner.png" alt="iHost — Host games. Start with Minecraft" width="720" />
+</p>
+
 Cross-platform **Minecraft server manager**: create servers (Vanilla, Paper, Purpur, Fabric, Forge, NeoForge, and more), manage mods and plugins, **share with friends without port forwarding**, and optionally sync to the cloud. Part of the [iHost](https://github.com/perlytiara/iHost) stack (backend, website, relay).
 
 ---
@@ -16,6 +20,10 @@ Cross-platform **Minecraft server manager**: create servers (Vanilla, Paper, Pur
 
 ## Quick start
 
+<p align="center">
+  <img src="docs/images/ihost-create-share-play.png" alt="Create → Share → Play" width="560" />
+</p>
+
 ```bash
 git clone https://github.com/perlytiara/iHostMC.git
 cd iHostMC
@@ -29,7 +37,19 @@ npm run tauri dev
 
 ---
 
+## One link. No router config.
+
+<p align="center">
+  <img src="docs/images/ihost-share-one-link.png" alt="Share one link with friends" width="480" />
+</p>
+
+---
+
 ## Auto-forwarding (relay) — no port forwarding
+
+<p align="center">
+  <img src="docs/images/ihost-relay-no-port-forward.png" alt="No port forwarding — relay connects you and friends" width="520" />
+</p>
 
 The app can expose your server to the internet **without opening ports** on your router:
 
@@ -38,6 +58,16 @@ The app can expose your server to the internet **without opening ports** on your
 3. Share that address (e.g. `play.ihost.one:xxxxx`) with friends; they join in Minecraft.
 
 First time may download the tunnel tool; after that it’s quick. If players see “Invalid session,” restart the server once. The relay is part of the [iHost](https://github.com/perlytiara/iHost) server component; for self-hosting the full stack, see the main iHost repo.
+
+---
+
+## The app
+
+<p align="center">
+  <img src="docs/images/ihost-app-window-mockup.png" alt="iHostMC app — server list, dark theme" width="560" />
+</p>
+
+Dark theme, server list, one-click start—and **Share server** for a link your friends can use right away.
 
 ---
 
