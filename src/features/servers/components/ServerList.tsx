@@ -1748,9 +1748,13 @@ export function ServerList({
                   /* No servers – full-screen build-from-scratch / import */
                   <div className="flex flex-1 flex-col items-center justify-center gap-8 p-8 text-center w-full max-w-2xl mx-auto">
                     <motion.div initial={{ opacity: 0, y: 8 }} animate={{ opacity: 1, y: 0 }} className="flex flex-col items-center gap-4">
-                      <div className="rounded-2xl bg-primary/10 p-6">
-                        <Server className="h-16 w-16 text-primary" />
-                      </div>
+                      <img
+                        src="/assets/app-empty-servers.png"
+                        alt=""
+                        className="h-36 w-auto object-contain sm:h-44"
+                        width={400}
+                        height={280}
+                      />
                       <h2 className="text-xl font-bold text-foreground">{t("servers.noServersTitle", { defaultValue: "No servers yet" })}</h2>
                       <p className="text-sm text-muted-foreground">{t("servers.noServersDesc", { defaultValue: "Build your first server from scratch or import an existing one." })}</p>
                     </motion.div>
@@ -3343,6 +3347,7 @@ function ServerOverview({
             <p className="text-xs font-medium text-foreground">{t("servers.relayShareTitle")}</p>
             {shareAddress ? (
               <div className="space-y-1.5">
+                <img src="/assets/app-share-success.png" alt="" className="h-14 w-auto object-contain rounded-lg opacity-90" width={360} height={240} />
                 <div className="flex flex-wrap items-center gap-2">
                   <span
                     className={cn(

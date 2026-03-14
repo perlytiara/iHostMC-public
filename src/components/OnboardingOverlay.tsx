@@ -1,7 +1,6 @@
 import { motion, AnimatePresence } from "framer-motion";
 import { useState, useEffect } from "react";
 import { useTranslation } from "react-i18next";
-import { AppLogo } from "./AppLogo";
 import { Button } from "./ui/button";
 import { ArrowRight, X, Sparkles } from "lucide-react";
 
@@ -88,9 +87,15 @@ export function OnboardingOverlay({ completed = false, onComplete }: OnboardingO
                 <motion.div
                   animate={{ y: [-4, 4, -4] }}
                   transition={{ duration: 3, repeat: Infinity, ease: "easeInOut" }}
-                  className="mb-4"
+                  className="mb-4 flex justify-center"
                 >
-                  <AppLogo size={88} />
+                  <img
+                    src="/assets/app-onboarding-welcome.png"
+                    alt=""
+                    className="h-28 w-auto object-contain sm:h-32"
+                    width={400}
+                    height={300}
+                  />
                 </motion.div>
               )}
 

@@ -32,7 +32,6 @@ import { useCallback, useEffect, useRef, useState } from "react";
 import { useTranslation } from "react-i18next";
 import { invoke } from "@tauri-apps/api/core";
 import { getFrpPrefs } from "@/lib/tunnel-prefs";
-import { AppLogo } from "@/components/AppLogo";
 
 async function getAutostartEnabled(): Promise<boolean> {
   if (!isTauri()) return false;
@@ -95,6 +94,10 @@ export function SettingsView({ onClose, onEnsureAccountVisible, runInBackground 
   const [relayTestMessage, setRelayTestMessage] = useState("");
   const [upnpTestStatus, setUpnpTestStatus] = useState<"idle" | "loading" | "ok" | "error">("idle");
   const [upnpTestMessage, setUpnpTestMessage] = useState("");
+  const [updaterPrerelease, setUpdaterPrerelease] = useState(() => {
+    if (typeof window === "undefined") return false;
+    try { return localStorage.getItem("ihostmc-updater-prerelease") === "true"; } catch { return false; }
+  });
   const initialTabConsumed = useRef(false);
 
   useEffect(() => {
@@ -334,6 +337,19 @@ export function SettingsView({ onClose, onEnsureAccountVisible, runInBackground 
                       }}
                     />
                   </div>
+                  <div className="flex items-center justify-between rounded-xl border border-border bg-card p-4">
+                    <div>
+                      <p className="text-sm font-medium">{t("settings.updaterPrerelease", { defaultValue: "Include pre-releases" })}</p>
+                      <p className="text-xs text-muted-foreground mt-0.5">{t("settings.updaterPrereleaseDesc", { defaultValue: "Check for pre-release versions when updating." })}</p>
+                    </div>
+                    <ToggleSwitch
+                      checked={updaterPrerelease}
+                      onChange={(checked) => {
+                        setUpdaterPrerelease(checked);
+                        try { localStorage.setItem("ihostmc-updater-prerelease", checked ? "true" : "false"); } catch {}
+                      }}
+                    />
+                  </div>
                 </>
               )}
             </motion.div>
@@ -500,8 +516,14 @@ export function SettingsView({ onClose, onEnsureAccountVisible, runInBackground 
             <motion.div initial={{ opacity: 0, y: 8 }} animate={{ opacity: 1, y: 0 }} className="space-y-4">
               <h3 className="text-lg font-bold">{t("settings.aboutTitle")}</h3>
               <div className="rounded-xl border border-border bg-card p-4 space-y-3">
-                <div className="flex items-center gap-3">
-                  <AppLogo size={72} />
+                <div className="flex flex-wrap items-center gap-4">
+                  <img
+                    src="/assets/app-about-badge.png"
+                    alt=""
+                    className="h-20 w-auto object-contain rounded-lg sm:h-24"
+                    width={320}
+                    height={240}
+                  />
                   <div>
                     <p className="text-sm font-bold">iHostMC</p>
                     <p className="text-xs text-muted-foreground">v{APP_VERSION}</p>
