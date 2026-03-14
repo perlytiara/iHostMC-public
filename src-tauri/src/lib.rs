@@ -162,6 +162,12 @@ pub fn run() {
                 })
                 .build(app)?;
 
+            // Explicitly show and focus the main window on startup
+            if let Some(window) = app.get_webview_window("main") {
+                let _ = window.show();
+                let _ = window.set_focus();
+            }
+
             tauri::async_runtime::spawn(async move {
                 server::ensure_app_dirs().await;
             });
