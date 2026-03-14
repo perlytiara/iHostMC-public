@@ -323,10 +323,16 @@ export function ServerList({
           // ignore (e.g. not in trash)
         }
       }
-      if (needRefresh) refresh();
+      if (needRefresh) await refresh();
     },
     [servers, refresh]
   );
+
+  // Apply cloud state as soon as we have both local servers and synced list (e.g. on first load), so servers active on website show as active in app
+  useEffect(() => {
+    if (!isTauri() || !token || !getApiBaseUrl() || syncedServers.length === 0) return;
+    applyCloudStateToLocal(syncedServers);
+  }, [servers.length, syncedServers, token, applyCloudStateToLocal]);
 
   useEffect(() => {
     onServerCountChange?.(servers.length);
