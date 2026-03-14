@@ -300,6 +300,51 @@ export function ServerList({
   const [tunnelError, setTunnelError] = useState<string | null>(null);
   const [startError, setStartError] = useState<string | null>(null);
   const contextMenuRef = useRef<HTMLDivElement>(null);
+  const serversRef = useRef(servers);
+  serversRef.current = servers;
+  /** Skip next effect run when the only change was our own refresh() to avoid circular dependency / infinite loop. */
+  const weJustRefreshedRef = useRef(false);
+
+  /** When backend says a server is active (not archived, not trashed), make local state match so the app shows it as present/active. Defined early so useEffects below can depend on it. */
+  const applyCloudStateToLocal = useCallback(
+    async (syncedList: SyncServerInfo[]) => {
+      if (!isTauri()) return;
+      let needRefresh = false;
+      const currentServers = serversRef.current;
+      for (const s of syncedList) {
+        if (s.trashedAt || s.archived) continue;
+        const local = currentServers.find((l) => l.id === s.hostId);
+        if (!local || (!local.archived && !local.trashed_at)) continue;
+        try {
+          await invoke("unarchive_server", { id: s.hostId });
+          needRefresh = true;
+        } catch {
+          // ignore
+        }
+        try {
+          await invoke("restore_server", { id: s.hostId });
+          needRefresh = true;
+        } catch {
+          // ignore (e.g. not in trash)
+        }
+      }
+      if (needRefresh) {
+        weJustRefreshedRef.current = true;
+        await refresh();
+      }
+    },
+    [refresh]
+  );
+
+  // Apply cloud state as soon as we have both local servers and synced list (e.g. on first load), so servers active on website show as active in app
+  useEffect(() => {
+    if (!isTauri() || !token || !getApiBaseUrl() || syncedServers.length === 0) return;
+    if (weJustRefreshedRef.current) {
+      weJustRefreshedRef.current = false;
+      return;
+    }
+    applyCloudStateToLocal(syncedServers);
+  }, [servers.length, syncedServers, token, applyCloudStateToLocal]);
 
   useEffect(() => {
     onServerCountChange?.(servers.length);
@@ -326,23 +371,29 @@ export function ServerList({
     }
   }, [runningId]);
 
-  // Live sync with website: refresh synced servers (and thus iteration schedule) when viewing a server
+  // Live sync with website: refresh synced servers and apply cloud state when viewing a server (so active on website = active in app)
   const SYNC_REFRESH_MS = 60 * 1000;
   useEffect(() => {
     if (!token || !selectedId || !getApiBaseUrl()) return;
-    const id = setInterval(refreshSynced, SYNC_REFRESH_MS);
+    const id = setInterval(async () => {
+      const list = await refreshSynced();
+      await applyCloudStateToLocal(list);
+    }, SYNC_REFRESH_MS);
     return () => clearInterval(id);
-  }, [token, selectedId, refreshSynced]);
+  }, [token, selectedId, refreshSynced, applyCloudStateToLocal]);
 
-  // Refresh when app window regains focus (sync with website)
+  // Refresh when app window regains focus (sync with website; apply cloud state so servers active on website show active in app)
   useEffect(() => {
-    const onFocus = () => {
+    const onFocus = async () => {
       refresh();
-      if (token && getApiBaseUrl()) refreshSynced();
+      if (token && getApiBaseUrl()) {
+        const list = await refreshSynced();
+        await applyCloudStateToLocal(list);
+      }
     };
     window.addEventListener("focus", onFocus);
     return () => window.removeEventListener("focus", onFocus);
-  }, [refresh, refreshSynced, token]);
+  }, [refresh, refreshSynced, token, applyCloudStateToLocal]);
 
   useEffect(() => {
     if (!selectedId) {
@@ -702,10 +753,13 @@ export function ServerList({
   useEffect(() => {
     const interval = setInterval(async () => {
       refresh();
-      if (token && getApiBaseUrl()) await refreshSynced();
+      if (token && getApiBaseUrl()) {
+        const list = await refreshSynced();
+        await applyCloudStateToLocal(list);
+      }
     }, 45000);
     return () => clearInterval(interval);
-  }, [token, refresh, refreshSynced]);
+  }, [token, refresh, refreshSynced, applyCloudStateToLocal]);
 
   const sendServerCommand = useCallback((cmd: string) => {
     const line = cmd.endsWith("\n") ? cmd : `${cmd}\n`;
@@ -757,7 +811,7 @@ export function ServerList({
               </Button>
               <span className="text-sm font-semibold min-w-0 truncate flex-1">{t("servers.title")}</span>
               <div className="flex items-center gap-0.5 opacity-70 hover:opacity-100 transition-opacity">
-                <Button size="icon" variant="ghost" className="h-7 w-7" onClick={async () => { refresh(); if (token && getApiBaseUrl()) await refreshSynced(); }} disabled={metaSyncing} title={t("servers.refreshListAndCloud", { defaultValue: "Refresh list and sync with website (archive/trash from iHost.one)" })}>
+                <Button size="icon" variant="ghost" className="h-7 w-7" onClick={async () => { refresh(); if (token && getApiBaseUrl()) { const list = await refreshSynced(); await applyCloudStateToLocal(list); } }} disabled={metaSyncing} title={t("servers.refreshListAndCloud", { defaultValue: "Refresh list and sync with website (archive/trash from iHost.one)" })}>
                   {metaSyncing ? <Loader2 className="h-3.5 w-3.5 animate-spin" /> : <RefreshCw className="h-3.5 w-3.5" />}
                 </Button>
                 <Button size="icon" variant="ghost" className="h-7 w-7" onClick={() => { setCenterView("create"); setImportInitial(null); setCreateViewMinimized(false); }} title={t("servers.addServer")}>
@@ -1955,7 +2009,7 @@ function ServerBackupSyncTab({
   websiteBackupsUrl: string;
   token: string | null;
   syncNow: (serverId?: string) => Promise<string | undefined>;
-  refreshSynced: () => Promise<void>;
+  refreshSynced: () => Promise<SyncServerInfo[]>;
   syncing: boolean;
   fileSyncState: SyncFilesState;
   t: (key: string, opts?: Record<string, unknown>) => string;

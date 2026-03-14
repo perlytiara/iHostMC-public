@@ -13,8 +13,8 @@ export interface SyncState {
   syncedServers: SyncServerInfo[];
   /** Trigger a sync now. If serverId is passed, only that server is registered/synced and the backend server id is returned; otherwise all servers and returns undefined. */
   syncNow: (serverId?: string) => Promise<string | undefined>;
-  /** Refresh list of synced servers from backend (GET /api/sync/servers) */
-  refreshSynced: () => Promise<void>;
+  /** Refresh list of synced servers from backend (GET /api/sync/servers). Returns the list so callers can apply cloud state to local (e.g. unarchive/restore when server is active on website). */
+  refreshSynced: () => Promise<SyncServerInfo[]>;
 }
 
 /**
@@ -35,16 +35,18 @@ export function useSyncServers(
   const [error, setError] = useState<string | null>(null);
   const [syncedServers, setSyncedServers] = useState<SyncServerInfo[]>([]);
 
-  const refreshSynced = useCallback(async () => {
-    if (!token || !getApiBaseUrl()) return;
+  const refreshSynced = useCallback(async (): Promise<SyncServerInfo[]> => {
+    if (!token || !getApiBaseUrl()) return [];
     try {
       const list = await api.getSyncServers(token);
       setSyncedServers(list);
       setError(null);
+      return list;
     } catch (e) {
       setSyncedServers([]);
       const msg = e instanceof Error ? e.message : String(e);
       if (msg.includes("migrations") || msg.includes("Sync not available")) setError(msg);
+      return [];
     }
   }, [token]);
 
