@@ -34,6 +34,7 @@ import {
 } from "@/lib/dev-overrides";
 import { useDevOverrides } from "@/hooks/useDevOverrides";
 import { HomeHeroIllustration } from "@/components/HomeHeroIllustration";
+import { StatefulBackground } from "@/components/StatefulBackground";
 
 interface HomePageProps {
   serverCount: number;
@@ -404,16 +405,8 @@ export function HomePage({
   const firstServerName = firstServer?.name ?? null;
 
   return (
-    <div className="relative flex min-h-0 flex-1 flex-col overflow-hidden bg-[hsl(var(--background))]">
-      <div className="pointer-events-none absolute inset-0 overflow-hidden opacity-30">
-        <div
-          className="absolute inset-0"
-          style={{
-            backgroundImage: `radial-gradient(ellipse 80% 50% at 50% 0%, hsl(var(--primary) / 0.06), transparent)`,
-          }}
-        />
-      </div>
-
+    <div className="relative flex min-h-0 flex-1 flex-col overflow-hidden bg-background">
+      <StatefulBackground running={false} />
       <div className="relative z-10 flex min-h-0 flex-1 flex-col">
         {!isSignedIn ? (
           <HomeSignedOut

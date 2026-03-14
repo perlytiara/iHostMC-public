@@ -11,6 +11,7 @@ import {
   Loader2,
   FolderArchive,
 } from "lucide-react";
+import { StatefulBackground } from "@/components/StatefulBackground";
 import { Button } from "@/components/ui/button";
 import { getToken } from "@/features/auth";
 import { api, getApiBaseUrl, getWebsiteBackupsUrl, getCloudServerUrl } from "@/lib/api-client";
@@ -110,7 +111,9 @@ export function StoragePage({ onOpenAccount }: StoragePageProps) {
   }
 
   return (
-    <div className="flex flex-1 flex-col overflow-hidden">
+    <div className="relative flex flex-1 flex-col overflow-hidden bg-background">
+      <StatefulBackground running={false} />
+      <div className="relative z-10 flex flex-1 flex-col overflow-hidden">
       <div className="shrink-0 border-b border-border bg-card/30 px-6 py-4">
         <div className="flex flex-wrap items-center justify-between gap-4">
           <div className="flex items-center gap-2">
@@ -242,6 +245,7 @@ export function StoragePage({ onOpenAccount }: StoragePageProps) {
             </section>
           </div>
         )}
+      </div>
       </div>
     </div>
   );

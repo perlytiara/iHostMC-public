@@ -1,5 +1,6 @@
 "use client";
 
+import { StatefulBackground } from "@/components/StatefulBackground";
 import { Button } from "@/components/ui/button";
 import { useDesign } from "@/components/design-provider";
 import { useTheme, THEMES, type ThemeId } from "@/components/theme-provider";
@@ -221,9 +222,10 @@ export function SettingsView({ onClose, onEnsureAccountVisible, runInBackground 
   }, [t]);
 
   return (
-    <div className="flex min-h-0 flex-1 overflow-hidden">
+    <div className="relative flex min-h-0 flex-1 overflow-hidden bg-background">
+      <StatefulBackground running={false} />
       {/* Settings sidebar */}
-      <aside className="flex w-52 flex-shrink-0 flex-col border-r border-border bg-card/50 p-3">
+      <aside className="relative z-10 flex w-52 flex-shrink-0 flex-col border-r border-border bg-card/50 p-3">
         <div className="mb-4 flex items-center gap-2">
           {onClose && (
             <motion.button
@@ -269,8 +271,8 @@ export function SettingsView({ onClose, onEnsureAccountVisible, runInBackground 
         </nav>
       </aside>
 
-      {/* Content area */}
-      <div className="flex-1 overflow-y-auto bg-background p-6">
+      {/* Content area — bg-transparent so StatefulBackground gradient shows through like other tabs */}
+      <div className="relative z-10 flex-1 overflow-y-auto bg-transparent p-6">
         <div className={cn("mx-auto space-y-6", (activeTab === "account" || activeTab === "backup" || activeTab === "developer") ? "max-w-4xl" : "max-w-xl")}>
           {activeTab === "backup" && (
             <motion.div initial={{ opacity: 0, y: 4 }} animate={{ opacity: 1, y: 0 }} className="space-y-6">
@@ -287,7 +289,7 @@ export function SettingsView({ onClose, onEnsureAccountVisible, runInBackground 
             </motion.div>
           )}
           {activeTab === "account" && (
-            <div className="min-h-[320px] w-full bg-background" role="region" aria-label={t("settings.account")}>
+            <div className="min-h-[320px] w-full bg-transparent" role="region" aria-label={t("settings.account")}>
               <div className="space-y-6">
                 <div>
                   <h3 className="text-lg font-bold">{t("settings.account")}</h3>
