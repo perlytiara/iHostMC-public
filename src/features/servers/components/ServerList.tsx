@@ -300,15 +300,20 @@ export function ServerList({
   const [tunnelError, setTunnelError] = useState<string | null>(null);
   const [startError, setStartError] = useState<string | null>(null);
   const contextMenuRef = useRef<HTMLDivElement>(null);
+  const serversRef = useRef(servers);
+  serversRef.current = servers;
+  /** Skip next effect run when the only change was our own refresh() to avoid circular dependency / infinite loop. */
+  const weJustRefreshedRef = useRef(false);
 
   /** When backend says a server is active (not archived, not trashed), make local state match so the app shows it as present/active. Defined early so useEffects below can depend on it. */
   const applyCloudStateToLocal = useCallback(
     async (syncedList: SyncServerInfo[]) => {
       if (!isTauri()) return;
       let needRefresh = false;
+      const currentServers = serversRef.current;
       for (const s of syncedList) {
         if (s.trashedAt || s.archived) continue;
-        const local = servers.find((l) => l.id === s.hostId);
+        const local = currentServers.find((l) => l.id === s.hostId);
         if (!local || (!local.archived && !local.trashed_at)) continue;
         try {
           await invoke("unarchive_server", { id: s.hostId });
@@ -323,14 +328,21 @@ export function ServerList({
           // ignore (e.g. not in trash)
         }
       }
-      if (needRefresh) await refresh();
+      if (needRefresh) {
+        weJustRefreshedRef.current = true;
+        await refresh();
+      }
     },
-    [servers, refresh]
+    [refresh]
   );
 
   // Apply cloud state as soon as we have both local servers and synced list (e.g. on first load), so servers active on website show as active in app
   useEffect(() => {
     if (!isTauri() || !token || !getApiBaseUrl() || syncedServers.length === 0) return;
+    if (weJustRefreshedRef.current) {
+      weJustRefreshedRef.current = false;
+      return;
+    }
     applyCloudStateToLocal(syncedServers);
   }, [servers.length, syncedServers, token, applyCloudStateToLocal]);
 
