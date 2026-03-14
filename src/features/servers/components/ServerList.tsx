@@ -757,7 +757,7 @@ export function ServerList({
               </Button>
               <span className="text-sm font-semibold min-w-0 truncate flex-1">{t("servers.title")}</span>
               <div className="flex items-center gap-0.5 opacity-70 hover:opacity-100 transition-opacity">
-                <Button size="icon" variant="ghost" className="h-7 w-7" onClick={async () => { refresh(); if (token && getApiBaseUrl()) await refreshSynced(); }} disabled={metaSyncing} title={t("servers.refreshList", { defaultValue: "Refresh" })}>
+                <Button size="icon" variant="ghost" className="h-7 w-7" onClick={async () => { refresh(); if (token && getApiBaseUrl()) await refreshSynced(); }} disabled={metaSyncing} title={t("servers.refreshListAndCloud", { defaultValue: "Refresh list and sync with website (archive/trash from iHost.one)" })}>
                   {metaSyncing ? <Loader2 className="h-3.5 w-3.5 animate-spin" /> : <RefreshCw className="h-3.5 w-3.5" />}
                 </Button>
                 <Button size="icon" variant="ghost" className="h-7 w-7" onClick={() => { setCenterView("create"); setImportInitial(null); setCreateViewMinimized(false); }} title={t("servers.addServer")}>

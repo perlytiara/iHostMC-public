@@ -104,8 +104,8 @@ export function useSyncServers(
     return () => (useIdle ? cancelIdleCallback(id) : clearTimeout(id));
   }, [token, refreshSynced]);
 
-  // Background interval: keep synced list live without blocking UI
-  const BACKGROUND_REFRESH_MS = 2 * 60 * 1000;
+  // Background interval: keep synced list in sync with website (archive/trash from iHost.one)
+  const BACKGROUND_REFRESH_MS = 60 * 1000;
   useEffect(() => {
     if (!token || !getApiBaseUrl()) return;
     const id = setInterval(() => refreshSynced(), BACKGROUND_REFRESH_MS);
