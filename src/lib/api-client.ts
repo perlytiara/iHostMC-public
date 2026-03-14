@@ -758,6 +758,7 @@ export const api = {
         backupCount: payload.backupCount,
         miniSynced: payload.miniSynced,
         metadata: payload.metadata ?? {},
+        archived: false,
       }),
     });
   },
