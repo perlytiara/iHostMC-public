@@ -8,8 +8,8 @@ const RAW_BASE =
     ? (import.meta.env.VITE_API_BASE_URL as string).replace(/\/$/, "")
     : "";
 
-/** Production: api.ihost.one. Local dev: VITE_API_BASE_URL from .env. */
-const BASE = RAW_BASE;
+/** Production default so built app works without .env. Override with VITE_API_BASE_URL for dev or self-host. */
+const BASE = RAW_BASE || "https://api.ihost.one";
 
 export function getApiBaseUrl(): string {
   return BASE;
