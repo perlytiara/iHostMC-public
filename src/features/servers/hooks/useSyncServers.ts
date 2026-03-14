@@ -78,6 +78,13 @@ export function useSyncServers(
           },
         });
         if (serverId && s.id === serverId) backendId = res.id;
+        // Ensure server shows as active on website (not archived, not in trash)
+        try {
+          await api.unarchiveSyncServer(token, res.id);
+          await api.restoreSyncServer(token, res.id);
+        } catch (_) {
+          // Ignore if already active or restore not applicable
+        }
       }
       setLastSyncedAt(now);
       await refreshSynced();
