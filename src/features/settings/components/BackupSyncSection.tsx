@@ -6,6 +6,7 @@ import { useServers } from "@/features/servers/hooks/useServers";
 import { useSyncServers } from "@/features/servers/hooks/useSyncServers";
 import { getToken } from "@/features/auth";
 import { getApiBaseUrl, getWebsiteBackupsUrl, getWebsiteUrl, getHealth } from "@/lib/api-client";
+import { applyCloudStateToLocal } from "@/lib/apply-cloud-state";
 import { getAutoBackupEnabled, setAutoBackupEnabled } from "@/lib/sync-prefs";
 import {
   getIterationsEnabledForNewServers,
@@ -31,7 +32,7 @@ function getStorageHostLabel(): string {
 
 export function BackupSyncSection() {
   const { t } = useTranslation();
-  const { servers, loading: serversLoading } = useServers();
+  const { servers, loading: serversLoading, refresh } = useServers();
   const token = getToken();
   const {
     lastSyncedAt,
@@ -59,8 +60,11 @@ export function BackupSyncSection() {
   }, [hasBackend]);
 
   useEffect(() => {
-    if (hasBackend && isSignedIn && refreshSynced) refreshSynced();
-  }, [hasBackend, isSignedIn, refreshSynced]);
+    if (!hasBackend || !isSignedIn || !refreshSynced || !refresh) return;
+    refreshSynced().then((list) => {
+      if (list?.length && servers.length) applyCloudStateToLocal(list, servers, refresh);
+    });
+  }, [hasBackend, isSignedIn, refreshSynced, refresh, servers.length]);
 
   const handleAutoBackupChange = (checked: boolean) => {
     setAutoBackupEnabled(checked);
@@ -137,7 +141,10 @@ export function BackupSyncSection() {
               <Button
                 variant="outline"
                 size="default"
-                onClick={() => refreshSynced?.()}
+                onClick={async () => {
+                  const list = await refreshSynced?.();
+                  if (list && refresh) await applyCloudStateToLocal(list, servers, refresh);
+                }}
                 disabled={syncing}
                 title={t("settings.backupSync.refreshFromCloudTitle", { defaultValue: "Reload server list from cloud (archive/trash from iHost.one)" })}
                 className="gap-1.5"

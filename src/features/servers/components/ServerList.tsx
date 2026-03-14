@@ -85,6 +85,7 @@ import { BackupManifestView } from "./BackupManifestView";
 import { SyncProgressPanel, type FileMetaMap } from "./SyncProgressPanel";
 import { SyncedFilesTree } from "./SyncedFilesTree";
 import { getWebsiteBackupsUrl, getBackupDetailUrl, getCloudServerUrl, api, getApiBaseUrl } from "@/lib/api-client";
+import { applyCloudStateToLocal as applyCloudStateToLocalFromLib } from "@/lib/apply-cloud-state";
 import { toast } from "@/lib/toast-store";
 import { getServerIcons, getServerIcon, setServerIcon, SERVER_ICON_IDS, type ServerIconId } from "@/lib/server-icons";
 import {
@@ -271,33 +272,14 @@ export function ServerList({
   /** Skip next effect run when the only change was our own refresh() to avoid circular dependency / infinite loop. */
   const weJustRefreshedRef = useRef(false);
 
-  /** When backend says a server is active (not archived, not trashed), make local state match so the app shows it as present/active. Defined early so useEffects below can depend on it. */
+  /** When backend says a server is active (not archived, not trashed), make local state match so the app shows it as present/active. Uses shared util; wraps refresh to set weJustRefreshedRef. */
   const applyCloudStateToLocal = useCallback(
     async (syncedList: SyncServerInfo[]) => {
-      if (!isTauri()) return;
-      let needRefresh = false;
-      const currentServers = serversRef.current;
-      for (const s of syncedList) {
-        if (s.trashedAt || s.archived) continue;
-        const local = currentServers.find((l) => l.id === s.hostId);
-        if (!local || (!local.archived && !local.trashed_at)) continue;
-        try {
-          await invoke("unarchive_server", { id: s.hostId });
-          needRefresh = true;
-        } catch {
-          // ignore
-        }
-        try {
-          await invoke("restore_server", { id: s.hostId });
-          needRefresh = true;
-        } catch {
-          // ignore (e.g. not in trash)
-        }
-      }
-      if (needRefresh) {
+      const wrappedRefresh = async () => {
         weJustRefreshedRef.current = true;
         await refresh();
-      }
+      };
+      await applyCloudStateToLocalFromLib(syncedList, serversRef.current, wrappedRefresh);
     },
     [refresh]
   );
