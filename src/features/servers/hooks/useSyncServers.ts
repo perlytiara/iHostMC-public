@@ -93,6 +93,14 @@ export function useSyncServers(
       }
       setLastSyncedAt(now);
       await refreshSynced();
+      if (toSync.length > 0) {
+        try {
+          const { toast } = await import("sonner");
+          toast.success(`Synced ${toSync.length} server${toSync.length === 1 ? "" : "s"} to the cloud`);
+        } catch (_) {
+          // sonner not available
+        }
+      }
       return backendId;
     } catch (e) {
       setError(e instanceof Error ? e.message : String(e));
